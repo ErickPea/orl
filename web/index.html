@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OSINT-Auto · Panel de Inteligencia</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Barra lateral de navegación -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+            <circle cx="11" cy="11" r="2.5" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">OSINT-Auto</div>
+          <div class="brand-sub">Inteligencia v2.0</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="sidebarNav">
+        <button class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>Panel principal</span>
+        </button>
+        <button class="nav-item" data-view="cases">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="2.2"/></svg>
+          <span>Casos y Entidades</span>
+          <span class="nav-pill" id="navCasesCount">0</span>
+        </button>
+        <button class="nav-item" data-view="sna">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="9.6" y1="10.2" x2="6.6" y2="7.4"/><line x1="14.4" y1="10.2" x2="17.4" y2="7.4"/><line x1="9.6" y1="13.8" x2="6.6" y2="16.6"/><line x1="14.4" y1="13.8" x2="17.4" y2="16.6"/></svg>
+          <span>Círculo Cercano · SNA</span>
+          <span class="nav-pill">F5</span>
+        </button>
+        <button class="nav-item" data-view="agent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="18" x2="12" y2="21"/><circle cx="9" cy="11" r="1.5"/><circle cx="15" cy="11" r="1.5"/></svg>
+          <span>Agente Navegador</span>
+          <span class="nav-pill">LIVE</span>
+        </button>
+        <button class="nav-item" data-view="username">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>Username</span>
+        </button>
+        <button class="nav-item" data-view="social">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span>Redes Sociales</span>
+        </button>
+        <button class="nav-item" data-view="name">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>Nombre y Ubicación</span>
+        </button>
+        <button class="nav-item" data-view="email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          <span>Correo electrónico</span>
+        </button>
+        <button class="nav-item" data-view="phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span>Teléfono</span>
+        </button>
+        <button class="nav-item" data-view="breach">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <span>Brechas y Auditoría</span>
+        </button>
+        <button class="nav-item" data-view="media">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Metadatos de Media</span>
+        </button>
+        <button class="nav-item" data-view="full">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>Búsqueda completa</span>
+        </button>
+        <div class="nav-divider"></div>
+        <button class="nav-item" data-view="history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Historial de reportes</span>
+          <span class="nav-pill" id="navReportsCount">0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="ethics-note">
+          <strong>Uso responsable:</strong> solo fuentes públicas y cuentas con autorización o fin legítimo.
+        </div>
+      </div>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="viewTitle">Panel principal</h1>
+          <p class="subtitle" id="viewSubtitle">Estado de herramientas, accesos rápidos y reportes recientes</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="active-case-bar" title="Todas las búsquedas que ejecutes se guardarán automáticamente en el caso seleccionado">
+            <label for="activeCaseSelect">Caso activo:</label>
+            <select id="activeCaseSelect">
+              <option value="">Ninguno (solo output/)</option>
+            </select>
+          </div>
+          <div class="status-dot-pill" id="activeJobsPill">
+            <span class="dot idle"></span>
+            <span id="activeJobsText">Sin tareas en curso</span>
+          </div>
+          <button class="btn btn-ghost" id="btnRefreshAll" title="Actualizar estado e historial">Actualizar</button>
+        </div>
+      </header>
+
+      <!-- Barra global de confirmación de uso legítimo -->
+      <div class="consent-bar">
+        <label class="checkbox-label">
+          <input type="checkbox" id="globalConsent" />
+          <span>Confirmo que utilizaré OSINT-Auto únicamente sobre fuentes públicas y cuentas con autorización o interés legítimo (autodiagnóstico, auditoría, seguridad).</span>
+        </label>
+      </div>
+
+      <!-- ===================== VISTA: DASHBOARD ===================== -->
+      <section class="view active" id="view-dashboard">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Herramientas CLI activas</div>
+            <div class="kpi-value" id="kpiTools">—</div>
+            <div class="kpi-meta" id="kpiToolsSub">Comprobando entorno...</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Reportes guardados</div>
+            <div class="kpi-value" id="kpiReports">0</div>
+            <div class="kpi-meta">Carpeta local output/</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Detección de brechas</div>
+            <div class="kpi-value" id="kpiBreachEngine">XposedOrNot</div>
+            <div class="kpi-meta" id="kpiHibpMeta">HIBP API opcional</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Enriquecimiento local</div>
+            <div class="kpi-value" id="kpiLibs">—</div>
+            <div class="kpi-meta">phonenumbers + DNS MX</div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-head">
+            <h2>Estado del ecosistema</h2>
+            <span class="muted">Detectado automáticamente en tu máquina</span>
+          </div>
+          <div class="tool-pills" id="toolPills"></div>
+        </div>
+
+        <div class="quick-grid">
+          <button class="quick-card" data-jump="cases">
+            <div class="quick-badge emerald">FASE 1 · SQLITE</div>
+            <h3>Casos y Entidades</h3>
+            <p>Organiza investigaciones en SQLite, cruza perfiles y detecta posibles homónimos.</p>
+          </button>
+          <button class="quick-card" data-jump="social">
+            <div class="quick-badge cyan">REDES + GRAFO</div>
+            <h3>Redes sociales y huella</h3>
+            <p>Enfoque en plataformas sociales, metadatos públicos abiertos y grafo interactivo.</p>
+          </button>
+          <button class="quick-card" data-jump="email">
+            <div class="quick-badge violet">CORREO</div>
+            <h3>Inteligencia de correo</h3>
+            <p>Valida registros MX, consulta Gravatar público, Holehe y exposición en brechas.</p>
+          </button>
+          <button class="quick-card" data-jump="breach">
+            <div class="quick-badge rose">BRECHAS</div>
+            <h3>Brechas y k-Anonymity</h3>
+            <p>Detecta correos expuestos y audita contraseñas propias sin enviarlas a la red.</p>
+          </button>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-head">
+            <h2>Investigaciones recientes</h2>
+            <button class="btn btn-sm btn-ghost" data-jump="history">Ver todas</button>
+          </div>
+          <div id="recentReportsList" class="list-stack"></div>
+        </div>
+      </section>
+
+      <!-- ===================== VISTA: CASOS Y ENTIDADES (FASE 1) ===================== -->
+      <section class="view" id="view-cases">
+        <div class="cases-layout">
+          <div>
+            <form class="panel-card form-card" id="formCreateCase">
+              <div class="panel-head">
+                <h2>Nuevo caso</h2>
+                <span class="badge badge-alta">SQLite</span>
+              </div>
+              <div class="field">
+                <label for="cTitle">Título del caso *</label>
+                <input id="cTitle" type="text" placeholder="ej: Auditoría huella propia 2026" required />
+              </div>
+              <div class="field">
+                <label for="cSubject">Nombre o alias principal</label>
+                <input id="cSubject" type="text" placeholder="ej: Laura Gómez" />
+              </div>
+              <div class="field">
+                <label for="cPurpose">Propósito legítimo</label>
+                <select id="cPurpose">
+                  <option value="autodiagnostico">Autodiagnóstico / Huella propia</option>
+                  <option value="auditoria">Auditoría de seguridad autorizada</option>
+                  <option value="investigacion">Investigación / Fuentes abiertas</option>
+                  <option value="periodismo">Periodismo / Verificación</option>
+                  <option value="otro">Otro fin legítimo</option>
+                </select>
+              </div>
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="field">
+                  <label for="cSeedUser">Username semilla</label>
+                  <input id="cSeedUser" type="text" placeholder="ej: laura_dev" />
+                </div>
+                <div class="field">
+                  <label for="cSeedLoc">Ubicación / Zona</label>
+                  <input id="cSeedLoc" type="text" placeholder="ej: Bogotá, Colombia" />
+                </div>
+                <div class="field">
+                  <label for="cSeedEmail">Correo semilla</label>
+                  <input id="cSeedEmail" type="email" placeholder="opcional@dominio.com" />
+                </div>
+                <div class="field">
+                  <label for="cSeedPhone">Teléfono semilla</label>
+                  <input id="cSeedPhone" type="text" placeholder="+57300..." />
+                </div>
+              </div>
+              <div class="field">
+                <label for="cNotes">Notas / Alcance</label>
+                <input id="cNotes" type="text" placeholder="Contexto breve del caso..." />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" style="width:100%">Crear caso y activar</button>
+              </div>
+            </form>
+
+            <div class="panel-card">
+              <div class="panel-head">
+                <h2>Casos guardados</h2>
+                <span class="muted" id="casesCountLabel">0</span>
+              </div>
+              <div id="casesList" class="list-stack"></div>
+            </div>
+          </div>
+
+          <div id="caseDetailPane">
+            <div class="panel-card">
+              <div class="panel-head">
+                <h2>Detalle del caso y Resolución de Entidades</h2>
+              </div>
+              <p class="helper-text">
+                Selecciona un caso existente o crea uno nuevo a la izquierda. Al activarlo en la barra superior, todas las búsquedas (Username, Redes Sociales, Nombre, Correo, Teléfono, Brechas y Media) guardarán automáticamente sus hallazgos en SQLite y calcularán puntajes explicables para detectar coincidencias reales y posibles homónimos.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== VISTA SECUNDARIA: CÍRCULO CERCANO · SNA (FASE 5) ===================== -->
+      <section class="view" id="view-sna">
+        <div class="panel-card sna-toolbar-card">
+          <div class="sna-toolbar">
+            <div class="sna-toolbar-left">
+              <div class="field" style="min-width:230px;margin:0">
+                <label for="snaCaseSelect">Caso a explorar</label>
+                <select id="snaCaseSelect">
+                  <option value="">Selecciona un caso...</option>
+                </select>
+              </div>
+              <div class="segmented" id="snaViewSwitcher" style="margin:0;align-self:end">
+                <button type="button" class="seg-btn active" data-sna-mode="graph">Mapa Orbital / Red</button>
+                <button type="button" class="seg-btn" data-sna-mode="ranking">Ranking Círculo Cercano</button>
+                <button type="button" class="seg-btn" data-sna-mode="communities">Comunidades</button>
+              </div>
+            </div>
+            <div class="inline-actions" style="align-self:end">
+              <button type="button" class="btn btn-sm btn-primary" id="btnSnaRecompute">Recalcular SNA</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="btnSnaBackToCase">Ir al caso</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="snaKpiRow"></div>
+        <div id="snaWorkspace">
+          <div class="panel-card">
+            <div class="muted">Selecciona un caso con comentarios o interacciones ingeridas para explorar su Círculo Cercano y Comunidades.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== VISTA: AGENTE NAVEGADOR SUPERVISADO ===================== -->
+      <section class="view" id="view-agent">
+        <div class="panel-card">
+          <div class="panel-head">
+            <div>
+              <h2>Agente de Navegación Supervisada (Playwright)</h2>
+              <span class="muted">Inicias sesión manualmente en Chromium visible (cero contraseñas guardadas) y el agente recorre publicaciones y comentarios con pausa, reanudación y revisión previa.</span>
+            </div>
+            <span class="badge badge-info" id="agentPlaywrightBadge">Comprobando...</span>
+          </div>
+
+          <div class="two-col" style="margin-bottom:14px">
+            <div class="interest-card">
+              <strong>1. Autenticación segura en navegador visible</strong>
+              <div class="muted" style="font-size:12px">Abre la ventana oficial de login, inicia sesión (incluyendo 2FA si aplica) y ciérrala cuando termines.</div>
+              <div id="agentSessionsBox" class="list-stack" style="margin-top:8px"></div>
+            </div>
+
+            <form id="formAgentStart" class="interest-card">
+              <strong>2. Lanzar investigación supervisada en un caso</strong>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+                <div class="field">
+                  <label for="agCaseId">Caso destino *</label>
+                  <select id="agCaseId" required></select>
+                </div>
+                <div class="field">
+                  <label for="agPlatform">Red social *</label>
+                  <select id="agPlatform">
+                    <option value="instagram">Instagram Web</option>
+                    <option value="facebook">Facebook Web</option>
+                  </select>
+                </div>
+                <div class="field span-2">
+                  <label for="agTargetUrl">Perfil o URL objetivo *</label>
+                  <input id="agTargetUrl" type="text" placeholder="ej: https://www.instagram.com/mi_usuario/ o mi_usuario" required />
+                </div>
+                <div class="field">
+                  <label for="agMaxPosts">Máx. publicaciones</label>
+                  <input id="agMaxPosts" type="number" min="1" max="40" value="12" />
+                </div>
+                <div class="field">
+                  <label for="agDelay">Pausa humana (seg)</label>
+                  <input id="agDelay" type="number" min="1" max="8" step="0.5" value="2.0" />
+                </div>
+              </div>
+              <div class="inline-actions" style="margin-top:6px">
+                <button type="submit" class="btn btn-sm btn-primary" id="btnAgentStart">Iniciar navegación supervisada</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div id="agentLiveMonitor"></div>
+        <div id="agentHistoryRuns"></div>
+        <div class="panel-card" id="agentFriendScanPanel" style="margin-top:16px">
+          <div class="panel-head">
+            <h2>Cuentas amigas (Pasada secundaria + Evidencia visual)</h2>
+            <span class="muted">Cola FIFO con retorno automático al perfil principal</span>
+          </div>
+          <label class="consent-row" style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+            <input type="checkbox" id="chkFriendScanAuth" />
+            <span>Confirmo que estas cuentas amigas son perfiles públicos autorizados y acepto el rate-limiting configurado.</span>
+          </label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button type="button" class="btn btn-sm btn-primary" id="btnStartFriendScan">Iniciar pasada en cuentas amigas</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btnRefreshFriendScan">Actualizar cola y evidencia</button>
+          </div>
+          <form id="formAddFriendByLink" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-top:10px;border-top:1px solid var(--border)">
+            <input id="inpFriendUrl" type="url" placeholder="https://www.instagram.com/amigo_publico/" required style="flex:2;min-width:220px" />
+            <select id="selFriendPlatform" style="max-width:140px">
+              <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
+              <option value="other">Otra</option>
+            </select>
+            <input id="inpFriendLabel" type="text" placeholder="Etiqueta opcional (ej. Amigo universidad)" style="flex:1;min-width:160px" />
+            <button type="submit" class="btn btn-sm btn-secondary">+ Añadir amigo por link</button>
+          </form>
+          <div id="agentFriendScanBody" class="muted">Selecciona un caso activo para ver candidatos amigos y estado de cola.</div>
+        </div>
+      </section>
+
+      <!-- ===================== VISTA: USERNAME ===================== -->
+      <section class="view" id="view-username">
+        <form class="panel-card form-card" id="formUsername">
+          <div class="panel-head">
+            <h2>Búsqueda por nombre de usuario</h2>
+            <span class="muted">Maigret (CSV + JSON metadatos) + Sherlock</span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="uInput">Username</label>
+              <input id="uInput" type="text" placeholder="ej: juanperez_dev" required />
+            </div>
+            <div class="field">
+              <label for="uCountry">País / zona (opcional)</label>
+              <select id="uCountry">
+                <option value="">Global (todos)</option>
+                <option value="co">Colombia (co)</option>
+                <option value="mx">México (mx)</option>
+                <option value="es">España (es)</option>
+                <option value="us">Estados Unidos (us)</option>
+                <option value="ar">Argentina (ar)</option>
+                <option value="cl">Chile (cl)</option>
+                <option value="pe">Perú (pe)</option>
+                <option value="ve">Venezuela (ve)</option>
+                <option value="ec">Ecuador (ec)</option>
+                <option value="uy">Uruguay (uy)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="uTop">Top sitios (Maigret)</label>
+              <select id="uTop">
+                <option value="100">Top 100 (rápido)</option>
+                <option value="200" selected>Top 200 (equilibrado)</option>
+                <option value="300">Top 300 (amplio)</option>
+                <option value="500">Top 500 (profundo)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Iniciar rastreo</button>
+          </div>
+        </form>
+
+        <div id="progress-username"></div>
+        <div id="results-username"></div>
+      </section>
+
+      <!-- ===================== VISTA: REDES SOCIALES ===================== -->
+      <section class="view" id="view-social">
+        <form class="panel-card form-card" id="formSocial">
+          <div class="panel-head">
+            <h2>Enfoque en Redes Sociales + Metadatos Públicos</h2>
+            <span class="muted">Maigret (--tags social) · Sherlock · APIs públicas · Open Graph</span>
+          </div>
+          <p class="helper-text">
+            Detecta presencia en redes sociales y muestra únicamente metadatos públicos accesibles sin iniciar sesión (GitHub, Reddit, Open Graph). Las redes detrás de muro de login (como Facebook, Instagram o LinkedIn) se marcan para revisión manual autorizada.
+          </p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="sInput">Username</label>
+              <input id="sInput" type="text" placeholder="ej: juanperez_dev" required />
+            </div>
+            <div class="field">
+              <label for="sCountry">País / zona (opcional)</label>
+              <select id="sCountry">
+                <option value="">Global (todos)</option>
+                <option value="co">Colombia (co)</option>
+                <option value="mx">México (mx)</option>
+                <option value="es">España (es)</option>
+                <option value="us">Estados Unidos (us)</option>
+                <option value="ar">Argentina (ar)</option>
+                <option value="cl">Chile (cl)</option>
+                <option value="pe">Perú (pe)</option>
+                <option value="ve">Venezuela (ve)</option>
+                <option value="ec">Ecuador (ec)</option>
+                <option value="uy">Uruguay (uy)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sMaxEnrich">Límite de metadatos públicos</label>
+              <select id="sMaxEnrich">
+                <option value="5">Hasta 5 redes (rápido)</option>
+                <option value="10" selected>Hasta 10 redes (equilibrado)</option>
+                <option value="15">Hasta 15 redes (amplio)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <label class="checkbox-label" style="margin-right:auto">
+              <input type="checkbox" id="sFetchMeta" checked />
+              <span>Consultar metadatos públicos abiertos (APIs públicas / Open Graph)</span>
+            </label>
+            <button type="submit" class="btn btn-primary">Analizar redes sociales</button>
+          </div>
+        </form>
+
+        <div id="progress-social"></div>
+        <div id="results-social"></div>
+      </section>
+
+      <!-- ===================== VISTA: NOMBRE Y UBICACIÓN ===================== -->
+      <section class="view" id="view-name">
+        <form class="panel-card form-card" id="formName">
+          <div class="panel-head">
+            <h2>Búsqueda por Nombre y Ubicación / Zona</h2>
+            <span class="muted">GitHub · ORCID · OpenAlex · Wikipedia · Buscadores (opcional API) · Matriz por red</span>
+          </div>
+          <p class="helper-text">
+            Busca perfiles públicos por nombre completo y ciudad/zona en fuentes abiertas oficiales y genera consultas optimizadas por red social. Si configuras <code>BRAVE_API_KEY</code> o <code>GOOGLE_CSE_KEY</code>+<code>GOOGLE_CSE_CX</code> en <code>.env</code>, también trae automáticamente los perfiles indexados de LinkedIn, Facebook, Instagram, X, TikTok y YouTube.
+          </p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="nFullName">Nombre completo *</label>
+              <input id="nFullName" type="text" placeholder="ej: Laura Gómez Martínez" required />
+            </div>
+            <div class="field autocomplete-wrap">
+              <label for="nCity">Ciudad / Zona / Departamento</label>
+              <input id="nCity" type="text" autocomplete="off" placeholder="ej: Bogotá, Medellín, Cali..." />
+              <div class="autocomplete-list hidden" id="nCitySuggestions" role="listbox"></div>
+            </div>
+            <div class="field autocomplete-wrap">
+              <label for="nCountry">País</label>
+              <input id="nCountry" type="text" autocomplete="off" placeholder="ej: Colombia, México, España..." />
+              <div class="autocomplete-list hidden" id="nCountrySuggestions" role="listbox"></div>
+            </div>
+            <div class="field span-2">
+              <label for="nKeyword">Palabra clave opcional (profesión, universidad o empresa)</label>
+              <input id="nKeyword" type="text" placeholder="ej: ingeniería, Universidad Nacional, diseño..." />
+            </div>
+          </div>
+
+          <div class="mt-12">
+            <div class="muted" style="margin-bottom:8px">Redes sociales a incluir en la búsqueda:</div>
+            <div class="chip-row" id="namePlatformsPicker">
+              <label class="chip check-chip"><input type="checkbox" value="linkedin" checked /> LinkedIn</label>
+              <label class="chip check-chip"><input type="checkbox" value="facebook" checked /> Facebook</label>
+              <label class="chip check-chip"><input type="checkbox" value="instagram" checked /> Instagram</label>
+              <label class="chip check-chip"><input type="checkbox" value="x" checked /> X / Twitter</label>
+              <label class="chip check-chip"><input type="checkbox" value="tiktok" checked /> TikTok</label>
+              <label class="chip check-chip"><input type="checkbox" value="youtube" checked /> YouTube</label>
+              <label class="chip check-chip"><input type="checkbox" value="github" checked /> GitHub</label>
+              <label class="chip check-chip"><input type="checkbox" value="pinterest" checked /> Pinterest</label>
+              <label class="chip check-chip"><input type="checkbox" value="medium" /> Medium</label>
+              <label class="chip check-chip"><input type="checkbox" value="threads" /> Threads</label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Buscar por nombre y zona</button>
+          </div>
+        </form>
+
+        <div id="progress-name"></div>
+        <div id="results-name"></div>
+      </section>
+
+      <!-- ===================== VISTA: CORREO ===================== -->
+      <section class="view" id="view-email">
+        <form class="panel-card form-card" id="formEmail">
+          <div class="panel-head">
+            <h2>Investigación por correo electrónico</h2>
+            <span class="muted">DNS MX · Gravatar · Holehe · Brechas de datos</span>
+          </div>
+          <div class="segmented" id="emailModeTabs">
+            <button type="button" class="seg-btn active" data-mode="lookup">Correo conocido (rápido)</button>
+            <button type="button" class="seg-btn" data-mode="osint">Correo + usernames derivados</button>
+            <button type="button" class="seg-btn" data-mode="generate">Generar desde username</button>
+          </div>
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="eTarget" id="eTargetLabel">Correo electrónico</label>
+              <input id="eTarget" type="text" placeholder="ej: usuario@gmail.com" required />
+            </div>
+            <div class="field hidden" id="eLimitWrap">
+              <label for="eLimit">Candidatos a verificar</label>
+              <select id="eLimit">
+                <option value="4">4 correos</option>
+                <option value="8" selected>8 correos</option>
+                <option value="12">12 correos</option>
+                <option value="20">20 correos</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Analizar correo</button>
+          </div>
+        </form>
+
+        <div id="progress-email"></div>
+        <div id="results-email"></div>
+      </section>
+
+      <!-- ===================== VISTA: TELÉFONO ===================== -->
+      <section class="view" id="view-phone">
+        <form class="panel-card form-card" id="formPhone">
+          <div class="panel-head">
+            <h2>Análisis de número telefónico</h2>
+            <span class="muted">Validación internacional (phonenumbers) + Ignorant</span>
+          </div>
+          <div class="chip-row" id="phonePrefixChips">
+            <span class="muted">Prefijos rápidos:</span>
+            <button type="button" class="chip" data-prefix="+57">+57 CO</button>
+            <button type="button" class="chip" data-prefix="+52">+52 MX</button>
+            <button type="button" class="chip" data-prefix="+34">+34 ES</button>
+            <button type="button" class="chip" data-prefix="+1">+1 US</button>
+            <button type="button" class="chip" data-prefix="+54">+54 AR</button>
+            <button type="button" class="chip" data-prefix="+56">+56 CL</button>
+            <button type="button" class="chip" data-prefix="+51">+51 PE</button>
+          </div>
+          <div class="form-grid">
+            <div class="field span-2">
+              <label for="pInput">Número en formato internacional (E.164)</label>
+              <input id="pInput" type="text" placeholder="ej: +573001234567" required />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Analizar teléfono</button>
+          </div>
+        </form>
+
+        <div id="progress-phone"></div>
+        <div id="results-phone"></div>
+      </section>
+
+      <!-- ===================== VISTA: BRECHAS ===================== -->
+      <section class="view" id="view-breach">
+        <div class="two-col">
+          <form class="panel-card form-card" id="formBreachEmail">
+            <div class="panel-head">
+              <h2>Verificar correo en brechas</h2>
+              <span class="muted">XposedOrNot + HIBP opcional</span>
+            </div>
+            <p class="helper-text">
+              Informa en qué incidentes públicos apareció el correo, fecha y tipos de datos expuestos (correos, contraseñas/hashes o teléfonos). No extrae contraseñas en texto plano.
+            </p>
+            <div class="field">
+              <label for="bEmailInput">Correo electrónico</label>
+              <input id="bEmailInput" type="email" placeholder="ej: cuenta@dominio.com" required />
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Consultar brechas</button>
+            </div>
+          </form>
+
+          <form class="panel-card form-card" id="formBreachPwd">
+            <div class="panel-head">
+              <h2>Auditar contraseña propia</h2>
+              <span class="badge badge-alta">k-Anonymity</span>
+            </div>
+            <p class="helper-text">
+              Verifica si una contraseña <strong>tuya</strong> apareció en filtraciones. Solo se envían los primeros 5 caracteres de su hash SHA-1; nunca se guarda ni sale tu contraseña real.
+            </p>
+            <div class="field">
+              <label for="bPwdInput">Contraseña propia a evaluar</label>
+              <div class="pwd-wrap">
+                <input id="bPwdInput" type="password" autocomplete="off" placeholder="Escribe tu contraseña..." required />
+                <button type="button" class="btn btn-ghost btn-sm" id="btnTogglePwd">Ver</button>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-secondary">Auditar con k-Anonymity</button>
+            </div>
+            <div id="results-breach-pwd" class="mt-12"></div>
+          </form>
+        </div>
+
+        <div id="progress-breach"></div>
+        <div id="results-breach"></div>
+      </section>
+
+      <!-- ===================== VISTA: METADATOS DE MEDIA ===================== -->
+      <section class="view" id="view-media">
+        <form class="panel-card form-card" id="formMedia">
+          <div class="panel-head">
+            <h2>Extractor de Metadatos (Fotos, Imágenes y Videos)</h2>
+            <span class="muted">EXIF · GPS · XMP · ffprobe · Copia limpia sin metadatos</span>
+          </div>
+          <p class="helper-text">
+            Sube una foto o video original para inspeccionar cámara/celular, fecha, software, códecs, hashes y coordenadas GPS. Recuerda que redes como WhatsApp (foto), Instagram o Facebook eliminan el EXIF al recomprimir.
+          </p>
+          <div class="dropzone" id="mediaDropzone">
+            <input type="file" id="mediaFileInput" accept="image/*,video/*,.heic,.heif,.mkv,.mov,.mp4,.avi,.webm" hidden />
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="dropzone-title" id="mediaDropTitle">Arrastra aquí tu imagen o video, o haz clic para seleccionarlo</div>
+            <div class="muted" id="mediaDropSub">JPG, PNG, WebP, TIFF, HEIC, MP4, MOV, MKV, AVI, WebM (máx. 150 MB)</div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btnInspectMedia" disabled>Analizar metadatos</button>
+            <span class="muted" id="mediaStatusMsg"></span>
+          </div>
+        </form>
+
+        <div id="results-media"></div>
+      </section>
+
+      <!-- ===================== VISTA: COMPLETA ===================== -->
+      <section class="view" id="view-full">
+        <form class="panel-card form-card" id="formFull">
+          <div class="panel-head">
+            <h2>Pipeline completo (5 pasos automáticos)</h2>
+            <span class="muted">Username → Correos → Blackbird → Teléfono → Brechas &amp; Reportes</span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="fUsername">Username del objetivo *</label>
+              <input id="fUsername" type="text" placeholder="ej: juanperez" required />
+            </div>
+            <div class="field">
+              <label for="fCountry">País (opcional)</label>
+              <select id="fCountry">
+                <option value="">Global (todos)</option>
+                <option value="co">Colombia (co)</option>
+                <option value="mx">México (mx)</option>
+                <option value="es">España (es)</option>
+                <option value="us">Estados Unidos (us)</option>
+                <option value="ar">Argentina (ar)</option>
+                <option value="cl">Chile (cl)</option>
+                <option value="pe">Perú (pe)</option>
+                <option value="ve">Venezuela (ve)</option>
+                <option value="ec">Ecuador (ec)</option>
+                <option value="uy">Uruguay (uy)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fEmail">Correo conocido (opcional)</label>
+              <input id="fEmail" type="email" placeholder="ej: juan@gmail.com" />
+            </div>
+            <div class="field">
+              <label for="fPhone">Teléfono internacional (opcional)</label>
+              <input id="fPhone" type="text" placeholder="ej: +573001234567" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Ejecutar pipeline completo</button>
+          </div>
+        </form>
+
+        <div id="progress-full"></div>
+        <div id="results-full"></div>
+      </section>
+
+      <!-- ===================== VISTA: HISTORIAL ===================== -->
+      <section class="view" id="view-history">
+        <div class="panel-card" id="storageGovernanceCard">
+          <div class="panel-head">
+            <h2>Almacenamiento y Gobernanza (Fase 6)</h2>
+            <div class="inline-actions">
+              <button type="button" class="btn btn-xs btn-ghost" id="btnRefreshStorage">Actualizar</button>
+              <button type="button" class="btn btn-xs btn-danger" id="btnCleanOrphans">Limpiar temporales huérfanos</button>
+            </div>
+          </div>
+          <div id="storageGovernanceBody" class="muted">Consultando espacio en disco...</div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-head">
+            <h2>Historial de reportes</h2>
+            <input id="historyFilter" class="search-input" type="search" placeholder="Filtrar por objetivo, tipo o fecha..." />
+          </div>
+          <div id="historyList" class="list-stack"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Notificaciones flotantes -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
