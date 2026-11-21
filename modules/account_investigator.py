@@ -18,6 +18,8 @@ from modules.relational_language import analyze_case_relational_language
 from modules.text_analysis import analyze_case_nlp
 
 
+# Para qué sirve: detecta señales de vínculo interpersonal (familia, amistad, pareja) en textos del caso.
+# Cómo funciona: extrae pares recíprocos de `interactions`, ejecuta `analyze_case_relational_language`, guarda señales y recalcula el SNA.
 def run_case_relational_analysis(case_id: str, provider: str = "local") -> Optional[dict]:
     """
     Ejecuta el motor de lenguaje relacional sobre todos los comentarios y publicaciones
@@ -60,6 +62,8 @@ def run_case_relational_analysis(case_id: str, provider: str = "local") -> Optio
     }
 
 
+# Para qué sirve: orquesta la investigación integral autorizada de una cuenta social dentro de un caso.
+# Cómo funciona: obtiene token OAuth2 si aplica, extrae vía conector, ingesta en SQLite y dispara Relacional, NLP y SNA.
 def investigate_social_account(
     case_id: str,
     platform: str,
@@ -79,6 +83,8 @@ def investigate_social_account(
     """
     Ejecuta la investigación integral autorizada de una cuenta seleccionada dentro de un caso.
     """
+    # Para qué sirve: reenvía eventos de avance al callback del job en curso si fue proporcionado.
+    # Cómo funciona: invoca `progress_cb(step, pct, log)` cuando no es `None`.
     def _emit(step: str, pct: int, log: str):
         if progress_cb:
             progress_cb(step, pct, log)

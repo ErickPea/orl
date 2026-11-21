@@ -19,6 +19,8 @@ from modules.text_analysis import analyze_case_nlp
 # ---------------------------------------------------------------------------
 # 1. Evaluación defensiva de exposición / privacidad integral del caso
 # ---------------------------------------------------------------------------
+# Para qué sirve: cuantifica qué tan fácil es perfilar al sujeto del caso usando solo fuentes públicas.
+# Cómo funciona: suma 4 dimensiones acotadas (identidad <=30, media GPS/dHash <=20, NLP <=25, SNA <=25) en un puntaje 0-100.
 def compute_case_exposure(
     detail: dict,
     vision: Optional[dict] = None,
@@ -123,6 +125,8 @@ def compute_case_exposure(
 # ---------------------------------------------------------------------------
 # 2. Anonimización consistente de terceros al exportar
 # ---------------------------------------------------------------------------
+# Para qué sirve: reemplaza handles de terceros por seudónimos (`Tercero_01`, ...) en SNA, NLP y Visión antes de exportar.
+# Cómo funciona: clona estructuras, registra primero `close_circle` y aplica reemplazos regex con límites de palabra excluyendo al sujeto.
 def anonymize_third_parties(
     sna: Optional[dict],
     nlp: Optional[dict],
@@ -142,6 +146,8 @@ def anonymize_third_parties(
     mapping = {}  # handle_lower -> "Tercero_01"
     aliases_set = set()
 
+    # Para qué sirve: devuelve o crea el seudónimo determinista para un handle de tercero.
+    # Cómo funciona: respeta al sujeto y asigna `Tercero_NN` incrementalmente en `mapping`.
     def alias_for(raw_handle: str) -> str:
         raw = (raw_handle or "").strip()
         if raw in aliases_set:
@@ -160,11 +166,15 @@ def anonymize_third_parties(
         for u in sna_copy.get("close_circle") or []:
             alias_for(u.get("id") or "")
 
+    # Para qué sirve: enmascara menciones `@`, `u/` y handles sueltos dentro de textos libres.
+    # Cómo funciona: sustituye por regex protegiendo alias ya creados y cuentas del sujeto.
     def mask_text(text: str) -> str:
         if not text:
             return text
         out = str(text)
 
+        # Para qué sirve: callback regex que reemplaza `@handle` por `@Tercero_NN`.
+        # Cómo funciona: conserva el texto original si pertenece al sujeto o ya es un seudónimo.
         def _rep_at(m):
             h = m.group(1)
             if h in aliases_set or h.lower() in subj_norm:
@@ -183,6 +193,8 @@ def anonymize_third_parties(
                 out = re.sub(rf"(?<![A-Za-z0-9_]){re.escape(real_h)}(?![A-Za-z0-9_])", pseudo, out, flags=re.I)
         return out
 
+    # Para qué sirve: anonimiza un nodo SNA y sus comentarios/citas sin procesarlo dos veces.
+    # Cómo funciona: rastrea objetos por `id(node)` en `seen_objs` y enmascara si `is_subject` es falso.
     def _anonymize_node_dict(node: dict, seen_objs: set) -> None:
         oid = id(node)
         if oid in seen_objs:
@@ -243,6 +255,8 @@ def anonymize_third_parties(
     return sna_copy, nlp_copy, vis_copy, len(mapping)
 
 
+# Para qué sirve: aplica la misma seudonimización `Tercero_NN` a interactuantes y evidencia de amigos.
+# Cómo funciona: siembra el mapa con `close_circle`, sustituye handles/URLs por `[perfil_anonimizado]` y limpia textos históricos.
 def _anonymize_extended_sections(
     interactants: list,
     friend_evidence: dict,
@@ -259,6 +273,8 @@ def _anonymize_extended_sections(
     aliases_set = set()
     counter = 0
 
+    # Para qué sirve: asigna de forma estable `Tercero_NN` a cada handle externo en secciones extendidas.
+    # Cómo funciona: protege cuentas del sujeto y reutiliza el contador único en `mapping`.
     def alias_for(handle: str) -> str:
         nonlocal counter
         clean = (handle or "").strip().lstrip("@")
@@ -322,6 +338,8 @@ def _anonymize_extended_sections(
 # ---------------------------------------------------------------------------
 # 3. Generador de Reporte Integral (HTML + PDF + JSON)
 # ---------------------------------------------------------------------------
+# Para qué sirve: construye el HTML autocontenido del Reporte Integral del Caso (`resumen.html`).
+# Cómo funciona: escapa cada valor externo con `html.escape` contra XSS, arma las 11 secciones e inserta filtro JS en la galería.
 def _render_integral_html(payload: dict) -> str:
     c = payload["case"]
     exp = payload["exposure"]
@@ -337,6 +355,8 @@ def _render_integral_html(payload: dict) -> str:
         else ("#f59e0b" if exp["level"] == "MODERADA" else "#10b981")
     )
 
+    # Para qué sirve: genera una insignia HTML segura para etiquetas de estado/confianza.
+    # Cómo funciona: envuelve el texto escapado en un `<span>` con la clase CSS indicada.
     def _badge(txt: str, cls: str = "b-info") -> str:
         return f'<span class="badge {cls}">{html.escape(str(txt))}</span>'
 
@@ -600,6 +620,8 @@ def _render_integral_html(payload: dict) -> str:
 </html>"""
 
 
+# Para qué sirve: prepara las secciones de texto plano para exportar el reporte integral a PDF con `fpdf2`.
+# Cómo funciona: mapea las 11 secciones del `payload` (más cautelas metodológicas) a listas de líneas formateadas.
 def _build_pdf_sections(payload: dict) -> dict:
     c = payload["case"]
     exp = payload["exposure"]
@@ -677,6 +699,8 @@ def _build_pdf_sections(payload: dict) -> dict:
     return sections
 
 
+# Para qué sirve: orquesta la exportación completa del caso en HTML, PDF y JSON con gobernanza de privacidad.
+# Cómo funciona: reúne visión, NLP, SNA, exposición, ubicación y amigos; aplica anonimización opcional, escribe archivos y registra la corrida.
 def generate_case_report(
     case_id: str,
     anonymize: bool = True,
@@ -897,6 +921,8 @@ def generate_case_report(
 # ---------------------------------------------------------------------------
 # 4. Gobernanza e Higiene de Almacenamiento (output/ y SQLite)
 # ---------------------------------------------------------------------------
+# Para qué sirve: mide recursivamente los bytes ocupados por una carpeta de `output/`.
+# Cómo funciona: recorre archivos con `rglob("*")` sumando `st_size` de forma tolerante a errores de E/S.
 def _dir_size_bytes(path: Path) -> int:
     total = 0
     for f in path.rglob("*"):
@@ -908,6 +934,8 @@ def _dir_size_bytes(path: Path) -> int:
     return total
 
 
+# Para qué sirve: audita el espacio en disco usado por reportes, SQLite y perfiles de navegador detectando huérfanos.
+# Cómo funciona: cruza `utils.list_reports()` contra `storage.get_all_referenced_folders()`, mide la BD y consulta `get_browser_cache_stats`.
 def storage_maintenance_summary() -> dict:
     """Informa uso de espacio de `output/` y `osint_cases.db`, identificando carpetas huérfanas."""
     referenced_folders = storage.get_all_referenced_folders()
@@ -947,6 +975,8 @@ def storage_maintenance_summary() -> dict:
     }
 
 
+# Para qué sirve: elimina carpetas huérfanas de `output/` que ya no están asociadas a ningún caso en SQLite.
+# Cómo funciona: lista candidatas desde `storage_maintenance_summary()`, simula si `dry_run=True` y verifica `target.parent == base` antes de borrar.
 def cleanup_orphan_outputs(dry_run: bool = True) -> dict:
     """
     Elimina carpetas de `output/` que no están vinculadas a ningún caso en SQLite.

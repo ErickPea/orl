@@ -68,11 +68,15 @@ _KNOWN_CENTROIDS = {
 }
 
 
+# Para qué sirve: elimina tildes y convierte a minúsculas para comparar topónimos contra centroides.
+# Cómo funciona: descompone en NFD con `unicodedata` y descarta marcas diacríticas (`Mn`).
 def _strip_accents(s: str) -> str:
     import unicodedata
     return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower()
 
 
+# Para qué sirve: asigna coordenadas y precisión estimada (`exif` o centroide aproximado) a una ubicación candidata.
+# Cómo funciona: si `is_exif=True` extrae `lat,lon` por regex; si no, busca coincidencia en `_KNOWN_CENTROIDS`.
 def _resolve_candidate_coords(label: str, country: str, region: str, city: str, is_exif: bool = False) -> tuple:
     """Devuelve `(lat, lon, precision)` desde EXIF o centroide aproximado conocido."""
     if is_exif and "," in (city or label):
@@ -90,12 +94,17 @@ def _resolve_candidate_coords(label: str, country: str, region: str, city: str, 
     return None, None, "none"
 
 
+# Para qué sirve: verifica si está permitida la geocodificación inversa externa con OpenStreetMap Nominatim.
+# Cómo funciona: prioriza `override` explícito y si es `None` evalúa `GEO_NOMINATIM_ENABLED` (apagado por defecto).
 def nominatim_enabled(override: Optional[bool] = None) -> bool:
+    """Indica si Nominatim está habilitado (opt-in explícito por parámetro o `GEO_NOMINATIM_ENABLED`)."""
     if override is not None:
         return bool(override)
     return (os.getenv("GEO_NOMINATIM_ENABLED", "false") or "false").strip().lower() in ("1", "true", "yes", "si")
 
 
+# Para qué sirve: traduce coordenadas GPS EXIF a país, región y ciudad vía Nominatim cuando el analista lo habilita.
+# Cómo funciona: consulta `/reverse` mediante `cached_get_json` (TTL 24 h, coordenadas redondeadas a 4 decimales).
 def _reverse_nominatim(lat: float, lon: float) -> Optional[dict]:
     """Consulta opcional (opt-in estricto) a OpenStreetMap Nominatim con caché TTL en SQLite."""
     from modules.http_client import cached_get_json
@@ -123,6 +132,8 @@ def _reverse_nominatim(lat: float, lon: float) -> Optional[dict]:
     return None
 
 
+# Para qué sirve: registra o refuerza una zona geográfica candidata acumulando evidencia y confianza sin duplicados.
+# Cómo funciona: agrupa en `buckets` por etiqueta en minúscula, prioriza EXIF o refuerza convergencia (+25% de `conf`, tope 0.92).
 def _add_candidate(buckets: dict, country: str, region: str, city: str, conf: float, source: str, evidence: str, is_exif: bool = False):
     label_parts = [p for p in (city, region, country) if p]
     if not label_parts:
@@ -161,6 +172,8 @@ def _add_candidate(buckets: dict, country: str, region: str, city: str, conf: fl
         entry["evidence"].append(evidence)
 
 
+# Para qué sirve: extrae latitud y longitud numéricas de un diccionario de elemento multimedia.
+# Cómo funciona: lee `gps_lat`/`gps_lon` directos y hace fallback a `metadata.gps` (`lat`/`latitude`, `lon`/`longitude`).
 def extract_media_gps(m: dict) -> Optional[dict]:
     """Obtiene coordenadas GPS EXIF desde `gps_lat`/`gps_lon` o desde `metadata.gps`."""
     if not isinstance(m, dict):
@@ -183,6 +196,8 @@ def extract_media_gps(m: dict) -> Optional[dict]:
     return None
 
 
+# Para qué sirve: produce el ranking probabilístico de ubicaciones del caso a partir de pistas visuales, EXIF y texto.
+# Cómo funciona: procesa primero GPS EXIF (con Nominatim opcional), aplica `_VISUAL_REGION_RULES`, añade `published_location`/NER y redacta enunciados cautelosos.
 def infer_case_locations(
     geo_hints: list,
     media_items: Optional[list] = None,

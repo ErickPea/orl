@@ -49,6 +49,8 @@ _URL_LINE_RE = re.compile(r"(https?://[^\s'\"<>)\]]+)", re.I)
 # ---------------------------------------------------------------------------
 # Normalización y filtrado
 # ---------------------------------------------------------------------------
+# Para qué sirve: unifica URLs de perfiles para deduplicar hallazgos equivalentes entre Maigret, Sherlock y Blackbird.
+# Cómo funciona: quita `/` final y prefijo `www.` del host y devuelve `host + path` en minúsculas.
 def _normalize_url(url: str) -> str:
     """
     Normaliza una URL para deduplicar hallazgos equivalentes entre herramientas
@@ -66,6 +68,8 @@ def _normalize_url(url: str) -> str:
     return f"{host}{path}"
 
 
+# Para qué sirve: oculta sitios sensibles o excluidos al generar los reportes consolidados.
+# Cómo funciona: combina `SENSIBLES` + `extra_excludes` y busca coincidencias en `sitio + url`.
 def _es_sensible(sitio: str, url: str, extra_excludes: list = None) -> bool:
     """Indica si el sitio/URL coincide con palabras excluidas (sensibles o exclusiones extra)."""
     texto = f"{sitio} {url}".lower()
@@ -76,6 +80,8 @@ def _es_sensible(sitio: str, url: str, extra_excludes: list = None) -> bool:
 # ---------------------------------------------------------------------------
 # Parsers por herramienta
 # ---------------------------------------------------------------------------
+# Para qué sirve: carga metadatos ricos (nombre, bio, ubicación, avatar) desde los JSON de Maigret.
+# Cómo funciona: lee `report_*.json`, extrae `status.ids` y los indexa por `_normalize_url(url_user)`.
 def _load_maigret_json_metadata(out_dir: Path) -> dict:
     """
     Carga metadatos enriquecidos desde los JSON de Maigret (`report_*_simple.json`).
@@ -119,6 +125,8 @@ def _load_maigret_json_metadata(out_dir: Path) -> dict:
     return meta_por_url
 
 
+# Para qué sirve: extrae perfiles confirmados desde los CSV de Maigret enriqueciéndolos con sus JSON.
+# Cómo funciona: filtra filas con `exists == "claimed"`, deduplica URLs, omite sensibles y adjunta metadatos de `_load_maigret_json_metadata`.
 def parse_maigret_found(out_dir: Path, ocultar_sensibles: bool = True,
                         extra_excludes: list = None) -> list:
     """
@@ -156,6 +164,8 @@ def parse_maigret_found(out_dir: Path, ocultar_sensibles: bool = True,
     return filas
 
 
+# Para qué sirve: parsea los archivos de salida de Sherlock en la carpeta de resultados.
+# Cómo funciona: busca URLs con `_URL_LINE_RE` en `sherlock_*.txt`, infiere el nombre del sitio y deduplica.
 def parse_sherlock_found(out_dir: Path, ocultar_sensibles: bool = True,
                          extra_excludes: list = None) -> list:
     """
@@ -198,6 +208,8 @@ def parse_sherlock_found(out_dir: Path, ocultar_sensibles: bool = True,
     return filas
 
 
+# Para qué sirve: recupera hallazgos guardados de Blackbird dentro de `out_dir`.
+# Cómo funciona: lee `blackbird_*.txt`, delega el parseo a `parse_blackbird_output` y filtra sensibles/duplicados.
 def parse_blackbird_found(out_dir: Path, ocultar_sensibles: bool = True,
                           extra_excludes: list = None) -> list:
     """
@@ -231,6 +243,8 @@ def parse_blackbird_found(out_dir: Path, ocultar_sensibles: bool = True,
 # ---------------------------------------------------------------------------
 # Consolidación, validación cruzada y scoring de confianza
 # ---------------------------------------------------------------------------
+# Para qué sirve: asigna la confianza (`ALTA`/`MEDIA`/`BAJA`) de un perfil detectado.
+# Cómo funciona: da `ALTA` si hay >=2 fuentes o metadatos con HTTP OK; `BAJA` en sitios ruidosos o HTTP anómalo; `MEDIA` en el resto.
 def _calcular_confianza(fuentes: list, http_status: str, metadata: dict, sitio: str) -> str:
     """
     Calcula el nivel de confianza del perfil encontrado:
@@ -252,6 +266,8 @@ def _calcular_confianza(fuentes: list, http_status: str, metadata: dict, sitio: 
     return "MEDIA"
 
 
+# Para qué sirve: fusiona y ordena en una sola lista deduplicada los resultados de Maigret, Sherlock y Blackbird.
+# Cómo funciona: agrupa por `_normalize_url`, combina `fuentes` y `metadata`, calcula confianza y ordena `ALTA -> MEDIA -> BAJA`.
 def consolidate_profiles(out_dir: Path, ocultar_sensibles: bool = True,
                          extra_excludes: list = None) -> list:
     """
@@ -314,6 +330,8 @@ def consolidate_profiles(out_dir: Path, ocultar_sensibles: bool = True,
     return consolidados
 
 
+# Para qué sirve: agrupa señales de identidad compartidas (nombres, ubicaciones, bios, avatares) entre perfiles encontrados.
+# Cómo funciona: recolecta conjuntos únicos desde `p["metadata"]` de cada perfil y los ordena por categoría.
 def extract_identity_signals(profiles: list) -> dict:
     """
     Agrega señales de correlación de identidad detectadas en metadatos de perfiles
@@ -344,6 +362,8 @@ def extract_identity_signals(profiles: list) -> dict:
     return signals
 
 
+# Para qué sirve: clasifica los perfiles consolidados por categoría temática con su resumen de precisión.
+# Cómo funciona: agrupa en `CATEGORIAS`/`Otros sitios` anteponiendo `[CONFIANZA]` y agrega las señales de correlación.
 def build_insights(found: list) -> dict:
     """
     Agrupa los perfiles consolidados por categoría incluyendo etiqueta de confianza y fuente(s),
@@ -389,6 +409,8 @@ def build_insights(found: list) -> dict:
     return ins
 
 
+# Para qué sirve: convierte la lista consolidada de perfiles en filas planas aptas para CSV.
+# Cómo funciona: extrae solo columnas escalares (`confianza`, `sitio`, `url`, `fuentes`, `http_status`, `metadatos`).
 def rows_for_csv(found: list) -> list:
     """Convierte los perfiles consolidados a filas planas aptas para CSV (sin dicts anidados)."""
     return [
@@ -407,6 +429,8 @@ def rows_for_csv(found: list) -> list:
 # ---------------------------------------------------------------------------
 # Escritura de CSV, PDF y HTML
 # ---------------------------------------------------------------------------
+# Para qué sirve: exporta una lista de diccionarios planos a un archivo CSV en UTF-8.
+# Cómo funciona: toma la unión ordenada de claves como cabecera y escribe mediante `csv.DictWriter`.
 def write_csv(out_dir: Path, rows: list, filename: str = "resumen_consolidado.csv"):
     """
     Escribe un archivo CSV en out_dir a partir de una lista de dicts.
@@ -424,11 +448,15 @@ def write_csv(out_dir: Path, rows: list, filename: str = "resumen_consolidado.cs
     utils.ok(f"CSV guardado -> {path}")
 
 
+# Para qué sirve: sanea cadenas UTF-8 a `latin-1` para evitar fallos en la fuente Helvetica de `fpdf2`.
+# Cómo funciona: codifica con `errors="replace"` a `latin-1` y decodifica de vuelta.
 def _latin1(texto) -> str:
     """Helvetica de fpdf2 solo soporta latin-1; se reemplaza lo demás para no romper el PDF."""
     return str(texto).encode("latin-1", "replace").decode("latin-1")
 
 
+# Para qué sirve: genera el documento `reporte_final.pdf` con secciones estructuradas y miniaturas locales.
+# Cómo funciona: maqueta con `FPDF`, itera `sections`, incrusta hasta 12 imágenes locales válidas y guarda en `out_dir`.
 def write_pdf(out_dir: Path, target: str, sections: dict, gallery_items: Optional[list] = None):
     """Escribe reporte_final.pdf con las secciones {titulo: dict|list|str} y miniaturas locales opcionales."""
     if not FPDF_OK:
@@ -442,6 +470,8 @@ def write_pdf(out_dir: Path, target: str, sections: dict, gallery_items: Optiona
     pdf.cell(0, 8, f"Generado: {datetime.now():%Y-%m-%d %H:%M:%S}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
+    # Para qué sirve: escribe un párrafo multilínea saneado en el PDF actual.
+    # Cómo funciona: llama a `pdf.multi_cell` convirtiendo el texto con `_latin1`.
     def linea(txt):
         pdf.multi_cell(0, 5, _latin1(txt), new_x="LMARGIN", new_y="NEXT")
 
@@ -516,6 +546,8 @@ HTML_TEMPLATE = """<!doctype html>
 </body></html>"""
 
 
+# Para qué sirve: convierte prefijos textuales `[ALTA]`/`[MEDIA]`/`[BAJA]` en insignias HTML coloreadas.
+# Cómo funciona: detecta el prefijo inicial de la línea escapada y lo reemplaza por `<span class="badge ...">`.
 def _formatear_badge(texto_escapado: str) -> str:
     """Reemplaza prefijos [ALTA]/[MEDIA]/[BAJA] por insignias visuales en HTML."""
     for nivel, clase in (("ALTA", "badge-alta"), ("MEDIA", "badge-media"), ("BAJA", "badge-baja")):
@@ -525,6 +557,8 @@ def _formatear_badge(texto_escapado: str) -> str:
     return texto_escapado
 
 
+# Para qué sirve: convierte una línea de hallazgo en un elemento `<li>` HTML con enlace clicable si incluye URL.
+# Cómo funciona: separa etiqueta, URL y cola de metadatos (` — ...`), escapa todo contra XSS y aplica `_formatear_badge`.
 def _item_html(item: str) -> str:
     """Convierte 'etiqueta: https://...' en enlace clicable (con badge de confianza si aplica)."""
     texto = str(item)
@@ -542,6 +576,8 @@ def _item_html(item: str) -> str:
     return f"<li>{_formatear_badge(html.escape(texto))}</li>"
 
 
+# Para qué sirve: estandariza secciones heterogéneas (dicts, listas o strings) a una lista de líneas para HTML.
+# Cómo funciona: aplana diccionarios a `"clave: valor"`, convierte colecciones a `str` y envuelve escalares en lista.
 def _normalizar_items_html(items) -> list:
     """
     Normaliza el valor de una sección de insights a una lista de strings.
@@ -562,6 +598,8 @@ def _normalizar_items_html(items) -> list:
     return [str(items)]
 
 
+# Para qué sirve: genera el archivo `resumen.html` con tarjetas de insights y datos extra escapados contra XSS.
+# Cómo funciona: normaliza cada sección con `_normalizar_items_html` + `_item_html` y las inserta en `HTML_TEMPLATE`.
 def write_html(out_dir: Path, target: str, insights: dict, extra: dict = None):
     """Escribe resumen.html. Todo se escapa porque el contenido viene de fuentes externas."""
     bloques = []

@@ -12,6 +12,8 @@ from modules.browser_adapters.selectors import get_platform_selectors
 from modules.connectors.common import extract_urls
 
 
+# Para qué sirve: normaliza una URL o handle de Facebook para navegar directamente al perfil y obtener su username.
+# Cómo funciona: si es URL extrae el primer segmento tras `facebook.com/`; si es alias construye `https://www.facebook.com/{uname}`.
 def _normalize_fb_url(target: str) -> tuple:
     raw = (target or "").strip()
     if raw.startswith(("http://", "https://")):
@@ -23,8 +25,11 @@ def _normalize_fb_url(target: str) -> tuple:
 
 
 class FacebookBrowserAdapter(BaseBrowserAdapter):
+    """Adaptador DOM/ARIA supervisado para perfiles, publicaciones y comentarios en Facebook Web."""
     platform = "facebook"
 
+    # Para qué sirve: extrae perfil, publicaciones, imágenes y comentarios visibles de Facebook Web respetando pausa y checkpoints.
+    # Cómo funciona: usa perfiles de `selectors.py`, hace scroll, abre el diálogo de comentarios con telemetría y emite hallazgos en vivo.
     def run(
         self,
         page,

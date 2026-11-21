@@ -70,6 +70,7 @@ def api_case_detail(case_id: str):
 
 @router.patch("/api/cases/{case_id}")
 def api_case_update(case_id: str, req: CaseUpdateRequest):
+    """Actualiza propiedades del caso (título, notas, estado o `friend_scope_enabled`)."""
     detail = storage.update_case(
         case_id=case_id,
         title=req.title,
@@ -95,6 +96,7 @@ def api_case_delete(case_id: str, delete_files: bool = False):
 
 @router.post("/api/cases/{case_id}/identifiers", status_code=201)
 def api_case_add_identifier(case_id: str, req: IdentifierCreateRequest):
+    """Añade una semilla/identificador al caso y recalcula resolución de entidades."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     ident = storage.add_identifier(
@@ -110,6 +112,7 @@ def api_case_add_identifier(case_id: str, req: IdentifierCreateRequest):
 
 @router.delete("/api/cases/{case_id}/identifiers/{identifier_id}")
 def api_case_delete_identifier(case_id: str, identifier_id: int):
+    """Elimina un identificador semilla del caso."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     ok = storage.delete_identifier(case_id, identifier_id)
@@ -120,6 +123,7 @@ def api_case_delete_identifier(case_id: str, identifier_id: int):
 
 @router.post("/api/cases/{case_id}/profiles", status_code=201)
 def api_case_add_profile(case_id: str, req: ProfileCreateRequest):
+    """Agrega o actualiza manualmente un perfil social del caso y recalcula homónimos."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     prof = storage.upsert_profile(

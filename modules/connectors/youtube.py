@@ -18,10 +18,14 @@ from modules.connectors.common import (
 YT_API = "https://www.googleapis.com/youtube/v3"
 
 
+# Para qué sirve: indica si la integración oficial con YouTube Data API v3 está habilitada.
+# Cómo funciona: verifica que `YOUTUBE_API_KEY` tenga valor no vacío en el entorno.
 def youtube_configured() -> bool:
     return bool(os.environ.get("YOUTUBE_API_KEY", "").strip())
 
 
+# Para qué sirve: normaliza un handle `@canal`, ID `UC...` o URL de YouTube antes de consultar la API.
+# Cómo funciona: extrae `@handle` o ID tras `/channel/` cuando recibe una URL completa de `youtube.com`.
 def _clean_handle(handle: str) -> str:
     h = (handle or "").strip()
     if "youtube.com/" in h:
@@ -33,6 +37,8 @@ def _clean_handle(handle: str) -> str:
     return h
 
 
+# Para qué sirve: consulta perfil de canal, videos recientes, miniaturas y comentarios públicos vía YouTube Data API v3.
+# Cómo funciona: resuelve el canal en `/channels`, lista videos en `/search` y lee hilos en `/commentThreads` para los últimos 3 videos.
 def fetch_youtube(handle: str, limit: int = 15, include_replies: bool = True, timeout: int = 12) -> dict:
     """Consulta canal público, videos recientes, miniaturas y comentarios públicos vía YouTube Data API v3."""
     clean = _clean_handle(handle)

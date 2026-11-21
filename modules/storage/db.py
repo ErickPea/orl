@@ -49,11 +49,16 @@ VALID_MANUAL_STATUS = {"auto", "confirmed", "rejected"}
 VALID_PURPOSES = {"autodiagnostico", "auditoria", "investigacion", "periodismo", "otro"}
 
 
+# Para qué sirve: Devuelve la fecha y hora local actual formateada para timestamps de SQLite.
+# Cómo funciona: Ejecuta `datetime.now().strftime("%Y-%m-%d %H:%M:%S")`.
 def _now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Para qué sirve: Resuelve qué archivo SQLite debe usar la aplicación en el hilo actual.
+# Cómo funciona: Prioriza `_CUSTOM_DB_PATH` si fue fijado en tests, luego la variable `OSINT_DB_PATH` y finalmente `DEFAULT_DB_PATH`.
 def get_db_path() -> Path:
+    """Resuelve la ruta activa de SQLite (`set_db_path`, `OSINT_DB_PATH` o ruta por defecto)."""
     if _CUSTOM_DB_PATH is not None:
         return _CUSTOM_DB_PATH
     env_path = os.environ.get("OSINT_DB_PATH", "").strip()
@@ -62,6 +67,8 @@ def get_db_path() -> Path:
     return DEFAULT_DB_PATH
 
 
+# Para qué sirve: Cierra de forma segura todas las conexiones SQLite activas en el pool global.
+# Cómo funciona: Incrementa `_POOL_EPOCH` bajo `_CONN_LOCK`, vacía `_CONN_REGISTRY` e invoca `.close()` en cada conexión registrada.
 def close_all_connections() -> None:
     """Cierra todas las conexiones SQLite cacheadas en el pool (seguro para tests y shutdown)."""
     global _POOL_EPOCH
@@ -76,6 +83,8 @@ def close_all_connections() -> None:
             _LOGGER.warning("Error cerrando conexión SQLite del pool: %s", exc)
 
 
+# Para qué sirve: Redirige la ruta de SQLite en tiempo de ejecución (por ejemplo, en pruebas automatizadas).
+# Cómo funciona: Cierra todas las conexiones cacheadas previas y asigna el nuevo `Path` a `_CUSTOM_DB_PATH`.
 def set_db_path(path: Optional[Path]) -> None:
     """Permite redirigir la base de datos (útil para pruebas automatizadas)."""
     global _CUSTOM_DB_PATH
@@ -83,6 +92,8 @@ def set_db_path(path: Optional[Path]) -> None:
     _CUSTOM_DB_PATH = Path(path) if path is not None else None
 
 
+# Para qué sirve: Obtiene o crea una conexión SQLite reutilizable asociada al hilo y epoch vigentes.
+# Cómo funciona: Valida salud de la conexión thread-local con `SELECT 1` o abre una nueva con `row_factory=Row` y PRAGMAs de concurrencia.
 def _get_thread_conn(db_path: Path) -> sqlite3.Connection:
     db_key = str(db_path.resolve())
     epoch = _POOL_EPOCH
@@ -121,6 +132,8 @@ def _get_thread_conn(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Para qué sirve: Provee un context manager transaccional que soporta anidamiento seguro en SQLite.
+# Cómo funciona: Controla profundidad thread-local creando `SAVEPOINT` cuando hay llamadas anidadas y ejecutando `commit` o `rollback` al salir.
 @contextmanager
 def _connect():
     db_path = get_db_path()
@@ -152,6 +165,8 @@ def _connect():
         _THREAD_LOCAL.depths[db_key] = max(0, cur_depth - 1)
 
 
+# Para qué sirve: Añade columnas faltantes a una tabla existente sin romper datos previos.
+# Cómo funciona: Consulta `PRAGMA table_info` y ejecuta `ALTER TABLE ... ADD COLUMN` para cada columna ausente en `specs`.
 def _add_missing_columns(conn: sqlite3.Connection, table: str, specs: tuple) -> None:
     cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     for col_name, col_def in specs:
@@ -159,6 +174,8 @@ def _add_missing_columns(conn: sqlite3.Connection, table: str, specs: tuple) -> 
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
 
 
+# Para qué sirve: Migración v1 que agrega columnas de análisis visual, autoría y ubicación a `media_items`.
+# Cómo funciona: Invoca `_add_missing_columns` sobre `media_items` y crea el índice `idx_media_post`.
 def _mig_v1_media_columns(conn: sqlite3.Connection) -> None:
     _add_missing_columns(
         conn,
@@ -179,6 +196,8 @@ def _mig_v1_media_columns(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_post ON media_items(post_id)")
 
 
+# Para qué sirve: Migración v2 que añade almacenamiento NLP/SNA en `cases` y ámbito/ubicación en `posts`.
+# Cómo funciona: Agrega columnas faltantes mediante `_add_missing_columns` en las tablas `cases` y `posts`.
 def _mig_v2_cases_and_posts(conn: sqlite3.Connection) -> None:
     _add_missing_columns(
         conn,
@@ -200,6 +219,8 @@ def _mig_v2_cases_and_posts(conn: sqlite3.Connection) -> None:
     )
 
 
+# Para qué sirve: Migración v3 que extiende `comments`, `interactants`, `interactions` y `browser_agent_runs`.
+# Cómo funciona: Añade columnas de relación con amigos, biografías, proximidad visual y cursor de reanudación vía `_add_missing_columns`.
 def _mig_v3_comments_interactants_agent(conn: sqlite3.Connection) -> None:
     _add_missing_columns(
         conn,
@@ -224,10 +245,14 @@ def _mig_v3_comments_interactants_agent(conn: sqlite3.Connection) -> None:
     _add_missing_columns(conn, "browser_agent_runs", (("resume_cursor", "TEXT DEFAULT ''"),))
 
 
+# Para qué sirve: Migración v4 que acelera consultas filtradas por estado en `jobs`.
+# Cómo funciona: Ejecuta `CREATE INDEX IF NOT EXISTS idx_jobs_status` sobre la columna `status`.
 def _mig_v4_jobs_status_index(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
 
 
+# Para qué sirve: Migración v5 que crea la tabla de caché HTTP persistente e índice de expiración.
+# Cómo funciona: Ejecuta `CREATE TABLE IF NOT EXISTS http_cache` y crea `idx_http_cache_expires`.
 def _mig_v5_http_cache(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -254,6 +279,8 @@ _MIGRATIONS = (
 )
 
 
+# Para qué sirve: Ejecuta secuencialmente las migraciones de esquema pendientes en SQLite.
+# Cómo funciona: Consulta `schema_migrations`, corre cada función en `_MIGRATIONS` no aplicada aún y registra su versión.
 def _run_migrations(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -279,6 +306,8 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         _LOGGER.info("Migración SQLite aplicada: v%s (%s)", ver, name)
 
 
+# Para qué sirve: Consulta la versión más alta de esquema registrada en la base de datos.
+# Cómo funciona: Ejecuta `SELECT COALESCE(MAX(version), 0)` sobre `schema_migrations` devolviendo `0` si la tabla no existe.
 def get_schema_version() -> int:
     """Devuelve la última versión de migración aplicada en la base actual."""
     try:
@@ -289,6 +318,8 @@ def get_schema_version() -> int:
         return 0
 
 
+# Para qué sirve: Inicializa el esquema completo de SQLite, modo WAL y migraciones al arrancar.
+# Cómo funciona: Toma `_DB_LOCK`, ejecuta `executescript` con todas las tablas base y llama a `_run_migrations`.
 def init_db() -> Path:
     """Crea las tablas e índices si no existen, activa WAL y aplica migraciones versionadas."""
     db_path = get_db_path()
@@ -703,6 +734,8 @@ def init_db() -> Path:
     return db_path
 
 
+# Para qué sirve: Deserializa cadenas JSON almacenadas en columnas SQLite devolviendo un valor por defecto si fallan.
+# Cómo funciona: Ejecuta `json.loads(raw)` capturando excepciones para registrar advertencia y retornar `default`.
 def _loads(raw: Optional[str], default):
     if not raw:
         return default
@@ -713,6 +746,8 @@ def _loads(raw: Optional[str], default):
         return default
 
 
+# Para qué sirve: Normaliza un identificador (username, email, teléfono o texto) para deduplicación consistente.
+# Cómo funciona: Aplica minúsculas, limpieza de `@`, filtrado de dígitos/signo `+` o `normalize_text` según `kind`.
 def _normalize_identifier(kind: str, value: str) -> str:
     val = (value or "").strip()
     if kind == "username":
@@ -724,11 +759,15 @@ def _normalize_identifier(kind: str, value: str) -> str:
     return normalize_text(val)
 
 
+# Para qué sirve: Genera una clave determinista SHA-256 para indexar respuestas en `http_cache`.
+# Cómo funciona: Concatena `source` en minúsculas y `query` separados por `:` y calcula su digest hexadecimal.
 def _http_cache_key(source: str, query: str) -> str:
     raw = f"{(source or '').strip().lower()}:{(query or '').strip()}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+# Para qué sirve: Recupera de SQLite una respuesta HTTP cacheada si aún no ha expirado.
+# Cómo funciona: Busca por `_http_cache_key`, elimina la fila si `expires_at <= now_ts` y devuelve `status_code` y `payload` decodificado.
 def get_http_cache(source: str, query: str) -> Optional[dict]:
     """Devuelve entrada vigente desde `http_cache` o None si expiró/no existe."""
     key = _http_cache_key(source, query)
@@ -754,6 +793,8 @@ def get_http_cache(source: str, query: str) -> Optional[dict]:
         return None
 
 
+# Para qué sirve: Almacena o renueva una respuesta JSON externa en la tabla `http_cache` con TTL configurable.
+# Cómo funciona: Ejecuta un upsert por `cache_key` reintentando tras `init_db()` si faltase la tabla.
 def set_http_cache(source: str, query: str, status_code: int, payload, ttl_seconds: int = 1800) -> None:
     """Persiste una respuesta HTTP JSON en `http_cache` con TTL en segundos."""
     ttl = max(1, int(ttl_seconds or 1))
@@ -784,6 +825,8 @@ def set_http_cache(source: str, query: str, status_code: int, payload, ttl_secon
                 _LOGGER.warning("No se pudo guardar caché HTTP para (%s, %s)", source, query)
 
 
+# Para qué sirve: Purga las entradas caducadas de la tabla `http_cache`.
+# Cómo funciona: Ejecuta `DELETE FROM http_cache WHERE expires_at <= ?` con el timestamp actual y retorna `rowcount`.
 def purge_expired_http_cache() -> int:
     """Elimina registros expirados de `http_cache`."""
     now_ts = int(time.time())

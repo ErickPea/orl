@@ -6,6 +6,7 @@ import { loadSnaCase } from "./sna.js";
 // ---------------------------------------------------------------------------
 // Agente de Navegación Supervisada (Playwright Headed + Pause/Resume/Cancel + Staging)
 // ---------------------------------------------------------------------------
+/** Inicializa la vista del Agente de Navegación Supervisada, sesiones e historial. */
 export async function openAgentView() {
   if (!state.cases.length) {
     await loadCases();
@@ -19,6 +20,7 @@ export async function openAgentView() {
   }
 }
 
+/** Consulta estado de Playwright, sesiones locales y acciones de login/limpieza de caché. */
 export async function loadAgentSessions() {
   const badge = document.getElementById("agentPlaywrightBadge");
   const box = document.getElementById("agentSessionsBox");
@@ -98,6 +100,7 @@ export async function loadAgentSessions() {
   }
 }
 
+/** Lista las ejecuciones pasadas y recientes del agente para el caso seleccionado. */
 export async function loadAgentCaseRuns(caseId) {
   const histEl = document.getElementById("agentHistoryRuns");
   if (!histEl || !caseId) return;
@@ -137,6 +140,7 @@ export async function loadAgentCaseRuns(caseId) {
   }
 }
 
+/** Activa el polling en vivo sobre una corrida de navegador supervisado. */
 export function startAgentPolling(runId) {
   state.agentRunId = runId;
   if (state.agentPoller) {
@@ -161,6 +165,7 @@ export function startAgentPolling(runId) {
   state.agentPoller = setInterval(tick, 1400);
 }
 
+/** Renderiza el monitor en vivo (Pausa/Reanudar/Cancelar, logs y bandeja de staging). */
 export function renderAgentLiveMonitor(run) {
   const mon = document.getElementById("agentLiveMonitor");
   if (!mon || !run) return;
@@ -298,6 +303,7 @@ export function renderAgentLiveMonitor(run) {
   });
 }
 
+/** Actualiza el panel de cuentas amigas aisladas, cola secundaria y comparación dHash opt-in. */
 export async function refreshFriendScanPanel() {
   const host = document.getElementById("agentFriendScanBody");
   const cid = getActiveCaseId();

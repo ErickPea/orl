@@ -21,6 +21,8 @@ except ImportError:
 _LOGGER = get_logger("http_client")
 
 
+# Para qué sirve: traduce la cabecera HTTP `Retry-After` en segundos de espera acotados para backoff.
+# Cómo funciona: parsea enteros directos o fechas HTTP-date con `email.utils`, limitando el resultado al rango `[0.05, max_wait]`.
 def parse_retry_after(header_val: Optional[str], default_wait: float = 1.5, max_wait: float = 12.0) -> float:
     """Interpreta cabecera `Retry-After` (segundos o fecha HTTP-date), acotada a `[0.05, max_wait]`."""
     raw = (header_val or "").strip()
@@ -38,6 +40,8 @@ def parse_retry_after(header_val: Optional[str], default_wait: float = 1.5, max_
     return max(0.05, min(wait, float(max_wait)))
 
 
+# Para qué sirve: centraliza peticiones GET JSON con caché SQLite TTL y reintentos homogéneos ante 429/503 o fallos de red.
+# Cómo funciona: consulta primero `http_cache`, reintenta respetando `Retry-After`/backoff exponencial y persiste respuestas 200/404.
 def cached_get_json(
     source: str,
     url: str,

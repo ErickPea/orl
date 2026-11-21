@@ -6,6 +6,7 @@ import { loadCases, _epistemicBadge, _reviewBadge } from "./cases.js";
 // ---------------------------------------------------------------------------
 // Fase 5 :: Vista Secundaria Laboratorio SNA (Grafo Orbital/Físico, Ranking y Comunidades)
 // ---------------------------------------------------------------------------
+/** Genera la insignia visual del anillo de cercanía SNA (`INTIMO`, `CERCANO` o `PERIFERICO`). */
 export function _tierBadgeHtml(tier) {
   const t = (tier || "PERIFERICO").toUpperCase();
   if (t === "INTIMO") return `<span class="badge sna-ring-badge-intimo">ANILLO 1 · ÍNTIMO</span>`;
@@ -14,6 +15,7 @@ export function _tierBadgeHtml(tier) {
   return `<span class="badge sna-ring-badge-periferico">ANILLO 3 · PERIFERIA</span>`;
 }
 
+/** Muestra vista previa resumida del Círculo Cercano SNA dentro de la ficha del caso. */
 export async function renderCaseSnaPreview(containerEl, caseId) {
   if (!containerEl) return;
   containerEl.innerHTML = `<div class="panel-card"><div class="muted">Calculando resumen de Círculo Cercano (SNA)...</div></div>`;
@@ -75,6 +77,7 @@ export async function renderCaseSnaPreview(containerEl, caseId) {
   }
 }
 
+/** Abre la vista dedicada del Laboratorio SNA cargando el caso activo o preferido. */
 export async function openSnaView(preferredCaseId = "") {
   if (!state.cases.length) {
     await loadCases();
@@ -90,6 +93,7 @@ export async function openSnaView(preferredCaseId = "") {
   }
 }
 
+/** Carga o recalcula en backend los datos SNA de `caseId` y re-renderiza el laboratorio. */
 export async function loadSnaCase(caseId, forceRecompute = false) {
   if (!caseId) return;
   state.sna.caseId = caseId;
@@ -109,6 +113,7 @@ export async function loadSnaCase(caseId, forceRecompute = false) {
   }
 }
 
+/** Renderiza el Laboratorio SNA en el modo activo (`graph`, `ranking` o `communities`). */
 export function renderSnaView() {
   if (state.sna.rafId) {
     cancelAnimationFrame(state.sna.rafId);
@@ -214,6 +219,7 @@ export function renderSnaView() {
   }
 }
 
+/** Conecta los formularios rápidos de importación y registro manual de interacciones SNA. */
 export function bindSnaQuickFeeders(caseId) {
   const fImp = document.getElementById("formSnaQuickImport");
   if (fImp) {
@@ -268,6 +274,7 @@ export function bindSnaQuickFeeders(caseId) {
   }
 }
 
+/** Muestra en el panel lateral derecho las métricas, reciprocidad y citas de un nodo SNA. */
 export function renderSnaInspector(containerEl, data, nodeId) {
   if (!containerEl || !data) return;
   const node = (data.nodes || []).find((n) => n.id === nodeId) || (data.close_circle || [])[0];
@@ -437,6 +444,7 @@ export function renderSnaInspector(containerEl, data, nodeId) {
   });
 }
 
+/** Dibuja controles y lienzo interactivo del grafo SNA en modo orbital o fuerza física. */
 export function renderSnaGraphMode(ws, data) {
   const comms = data.communities || [];
   ws.innerHTML = `
@@ -509,6 +517,7 @@ export function renderSnaGraphMode(ws, data) {
   mountSnaCanvas(data);
 }
 
+/** Monta la simulación física/orbital sobre `<canvas id="snaCanvas">` con zoom y selección. */
 export function mountSnaCanvas(data) {
   if (state.sna.rafId) {
     cancelAnimationFrame(state.sna.rafId);
@@ -839,6 +848,7 @@ export function mountSnaCanvas(data) {
   if (zRes) zRes.onclick = () => { zoom = 1.0; panX = 0; panY = 0; draw(); };
 }
 
+/** Renderiza la tabla ordenable y filtrable del ranking de cercanía SNA. */
 export function renderSnaRankingMode(ws, data) {
   const all = data.close_circle || [];
   const filtered = all.filter((u) => {
@@ -942,6 +952,7 @@ export function renderSnaRankingMode(ws, data) {
   renderSnaInspector(document.getElementById("snaInspector"), data, state.sna.selectedNodeId);
 }
 
+/** Renderiza las tarjetas de comunidades detectadas (Louvain / propagación de etiquetas). */
 export function renderSnaCommunitiesMode(ws, data) {
   const comms = data.communities || [];
   ws.innerHTML = `

@@ -12,6 +12,8 @@ from modules.logger import get_logger
 
 _LOGGER = get_logger("storage.geo_friends")
 
+# Para qué sirve: Reemplaza y guarda en SQLite las pistas visuales o EXIF de ubicación detectadas en una imagen.
+# Cómo funciona: Borra pistas previas de `(case_id, media_id)` e inserta cada diccionario de `hints` en `geo_hints`.
 def save_media_geo_hints(case_id: str, media_id: int, hints: list) -> list:
     """Reemplaza y persiste `geo_hints` para un media_id concreto del caso."""
     if not case_exists(case_id):
@@ -41,7 +43,10 @@ def save_media_geo_hints(case_id: str, media_id: int, hints: list) -> list:
     return saved
 
 
+# Para qué sirve: Lista todas las pistas geolocalizables (`geo_hints`) asociadas a los medios de un caso.
+# Cómo funciona: Realiza `LEFT JOIN` entre `geo_hints` y `media_items` ordenando por confianza descendente.
 def list_case_geo_hints(case_id: str) -> list:
+    """Lista todas las pistas visuales/EXIF de ubicación (`geo_hints`) guardadas para el caso."""
     if not case_exists(case_id):
         return []
     with _connect() as conn:
@@ -61,7 +66,10 @@ def list_case_geo_hints(case_id: str) -> list:
 # ---------------------------------------------------------------------------
 # Fases 0, 1, 2, 4 :: Historial de Ubicaciones, Amigos Aislados y Perfil del Sujeto
 # ---------------------------------------------------------------------------
+# Para qué sirve: Obtiene un elemento multimedia individual de un caso con sus metadatos decodificados.
+# Cómo funciona: Consulta `media_items` por `(case_id, media_id)` y parsea `metadata_json` y `vision_json`.
 def get_media_item(case_id: str, media_id: int) -> Optional[dict]:
+    """Recupera un archivo multimedia concreto del caso con su metadata parseada."""
     if not case_exists(case_id):
         return None
     with _connect() as conn:
@@ -77,6 +85,8 @@ def get_media_item(case_id: str, media_id: int) -> Optional[dict]:
     return d
 
 
+# Para qué sirve: Persiste un punto de ubicación en `location_history` respetando correcciones manuales previas.
+# Cómo funciona: Resuelve coordenadas faltantes si aplica, reemplaza la entrada automática o manual correspondiente e inserta auditoría si es override.
 def save_location_history_entry(
     case_id: str,
     media_id: Optional[int] = None,
@@ -93,6 +103,7 @@ def save_location_history_entry(
     published_at: str = "",
     is_manual_override: bool = False,
 ) -> Optional[dict]:
+    """Persiste una entrada en `location_history` respetando precedencia del override manual."""
     if not case_exists(case_id):
         return None
     if (lat is None or lon is None) and (city or region or country):
@@ -171,6 +182,8 @@ def save_location_history_entry(
     return dict(row) if row else None
 
 
+# Para qué sirve: Lista la línea temporal de ubicaciones del sujeto o de un amigo aplicando filtros y precedencia manual.
+# Cómo funciona: Ejecuta consulta parametrizada sobre `location_history` unida a `media_items` y prioriza `is_manual_override` por foto.
 def list_location_history(
     case_id: str,
     owner_type: str = "subject",
@@ -180,6 +193,7 @@ def list_location_history(
     min_confidence: float = 0.0,
     source: str = "",
 ) -> list:
+    """Devuelve el historial cronológico de ubicaciones filtrando por dueño, fechas, fuente y confianza."""
     if not case_exists(case_id):
         return []
     clauses = ["lh.case_id = ?", "COALESCE(lh.owner_type, 'subject') = ?"]
@@ -231,6 +245,8 @@ def list_location_history(
     return merged
 
 
+# Para qué sirve: Registra una cuenta amiga aislada por su URL pública y la vincula opcionalmente al grafo SNA.
+# Cómo funciona: Extrae el handle de la URL, inserta o actualiza `interactants` con `owner_type='friend'` y llama a `link_friend_to_subject_sna`.
 def add_friend_by_url(
     case_id: str,
     url: str,
@@ -239,6 +255,7 @@ def add_friend_by_url(
     status: str = "active",
     add_to_sna: bool = True,
 ) -> Optional[dict]:
+    """Registra una cuenta amiga aislada (`owner_type='friend'`) por URL y la enlaza al SNA si procede."""
     if not case_exists(case_id):
         return None
     clean_url = (url or "").strip()
@@ -285,7 +302,10 @@ def add_friend_by_url(
     return friend_dict
 
 
+# Para qué sirve: Lista todas las cuentas amigas registradas en un caso junto con sus contadores de datos aislados.
+# Cómo funciona: Consulta `interactants` con `owner_type='friend'` y cuenta posts, medios y ubicaciones por `owner_id`.
 def list_case_friends(case_id: str) -> list:
+    """Lista las cuentas amigas registradas manualmente junto con sus contadores aislados."""
     if not case_exists(case_id):
         return []
     with _connect() as conn:
@@ -304,7 +324,10 @@ def list_case_friends(case_id: str) -> list:
     return out
 
 
+# Para qué sirve: Obtiene la ficha aislada de un amigo con sus posts, fotos, historial geográfico y resumen público.
+# Cómo funciona: Filtra estrictamente por `owner_type='friend'` y `owner_id=friend_id`, extrae hashtags y lugares sin mezclar con el sujeto.
 def get_friend_isolated_detail(case_id: str, friend_id: int) -> Optional[dict]:
+    """Devuelve perfil, posts, fotos, historial de ubicaciones y resumen aislado del amigo."""
     if not case_exists(case_id):
         return None
     with _connect() as conn:
@@ -366,7 +389,10 @@ def get_friend_isolated_detail(case_id: str, friend_id: int) -> Optional[dict]:
     }
 
 
+# Para qué sirve: Actualiza el estado operativo de un amigo en la tabla `interactants`.
+# Cómo funciona: Ejecuta `UPDATE interactants SET status = ?, last_seen = ?` validando `owner_type='friend'`.
 def update_friend_status(case_id: str, friend_id: int, status: str) -> None:
+    """Actualiza el estado de acceso de un amigo (`active`, `pending_manual`, etc.)."""
     with _connect() as conn:
         conn.execute(
             "UPDATE interactants SET status = ?, last_seen = ? WHERE case_id = ? AND id = ? AND owner_type = 'friend'",
@@ -374,6 +400,8 @@ def update_friend_status(case_id: str, friend_id: int, status: str) -> None:
         )
 
 
+# Para qué sirve: Crea o refuerza una arista entre el amigo y el sujeto principal dentro del grafo SNA.
+# Cómo funciona: Determina el handle del sujeto, inserta o actualiza `interactions`, recalcula el SNA y deja bitácora de auditoría.
 def link_friend_to_subject_sna(
     case_id: str,
     friend_id: int,
@@ -452,6 +480,8 @@ def link_friend_to_subject_sna(
     return {"case_id": case_id, "friend_handle": f_handle, "subject_handle": subj_handle, "sna_stats": (sna or {}).get("stats")}
 
 
+# Para qué sirve: Almacena un lote extraído de un amigo manteniendo aislamiento total bajo `owner_type='friend'`.
+# Cómo funciona: Valida pertenencia del `friend_id`, actualiza bio si existe e inserta posts y medios ligados únicamente a ese `owner_id`.
 def ingest_friend_bundle(case_id: str, friend_id: int, bundle: dict) -> Optional[dict]:
     """Ingiere contenido de un amigo de forma ESTRICTAMENTE aislada (`owner_type='friend', owner_id=friend_id`)."""
     if not case_exists(case_id) or not isinstance(bundle, dict):
@@ -528,6 +558,8 @@ def ingest_friend_bundle(case_id: str, friend_id: int, bundle: dict) -> Optional
     return {"friend_id": friend_id, "posts_inserted": posts_in, "media_inserted": media_in}
 
 
+# Para qué sirve: Borra en cascada todo el contenido aislado asociado a un amigo y actualiza el grafo SNA.
+# Cómo funciona: Elimina filas de `location_history`, `media_items`, `posts`, `comments`, `friend_scan_runs`, enlaces y el interactuante, y recalcula SNA.
 def delete_friend_cascade(case_id: str, friend_id: int) -> bool:
     """Elimina en cascada únicamente el contenido aislado perteneciente a `friend_id`."""
     if not case_exists(case_id):
@@ -556,7 +588,10 @@ def delete_friend_cascade(case_id: str, friend_id: int) -> bool:
     return True
 
 
+# Para qué sirve: Regenera las entradas inferidas de `subject_profile` preservando las revisiones humanas existentes.
+# Cómo funciona: Respalda `(category, value) -> human_review` no pendientes, limpia la tabla para el caso e inserta las entradas nuevas.
 def replace_subject_profile_entries(case_id: str, entries: list) -> list:
+    """Reemplaza las inferencias pendientes de `subject_profile` conservando las ya revisadas por humanos."""
     if not case_exists(case_id):
         return []
     now = _now_iso()
@@ -595,7 +630,10 @@ def replace_subject_profile_entries(case_id: str, entries: list) -> list:
     return list_subject_profile(case_id)
 
 
+# Para qué sirve: Lista todas las entradas del perfil enriquecido del sujeto ordenadas por confianza descendente.
+# Cómo funciona: Consulta `subject_profile` por `case_id` y decodifica el campo JSON `evidence_refs`.
 def list_subject_profile(case_id: str) -> list:
+    """Lista las entradas del perfil enriquecido del sujeto ordenadas por categoría y confianza."""
     if not case_exists(case_id):
         return []
     with _connect() as conn:
@@ -611,7 +649,10 @@ def list_subject_profile(case_id: str) -> list:
     return out
 
 
+# Para qué sirve: Actualiza la revisión humana de una entrada específica del perfil enriquecido del sujeto.
+# Cómo funciona: Valida que `human_review` esté permitido, actualiza la fila en `subject_profile` y la retorna decodificada.
 def update_subject_profile_review(case_id: str, entry_id: int, human_review: str) -> Optional[dict]:
+    """Actualiza el estado de revisión humana (`pending|validated|ambiguous|discarded`) de una entrada."""
     if human_review not in ("pending", "validated", "ambiguous", "discarded"):
         raise ValueError("Estado de revisión inválido.")
     now = _now_iso()

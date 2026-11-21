@@ -56,10 +56,12 @@ export const state = {
   graphCache: {},   // graphId -> { graph, onlyAlta }
 };
 
+/** Devuelve el ID del caso activo seleccionado o `null`. */
 export function getActiveCaseId() {
   return state.activeCaseId || null;
 }
 
+/** Fija el caso activo en memoria, `localStorage` y el selector superior. */
 export function setActiveCaseId(caseId) {
   state.activeCaseId = caseId || "";
   if (state.activeCaseId) {
@@ -76,6 +78,7 @@ export function setActiveCaseId(caseId) {
 // ---------------------------------------------------------------------------
 // Utilidades seguras (escape HTML contra XSS, API helper y notificaciones)
 // ---------------------------------------------------------------------------
+/** Escapa caracteres HTML especiales para prevenir XSS en plantillas DOM. */
 export function esc(val) {
   return String(val ?? "")
     .replace(/&/g, "&amp;")
@@ -85,6 +88,7 @@ export function esc(val) {
     .replace(/'/g, "&#39;");
 }
 
+/** Muestra una notificación flotante temporal (`ok` o `err`). */
 export function toast(msg, type = "ok") {
   const box = document.getElementById("toastContainer");
   const el = document.createElement("div");
@@ -94,11 +98,13 @@ export function toast(msg, type = "ok") {
   setTimeout(() => el.remove(), 4200);
 }
 
+/** Lee el token CSRF/sesión inyectado en `<meta name="osint-api-token">`. */
 export function getApiToken() {
   if (typeof document === "undefined" || typeof document.querySelector !== "function") return "";
   return document.querySelector('meta[name="osint-api-token"]')?.getAttribute("content") || "";
 }
 
+/** Ejecuta una petición JSON contra el backend adjuntando `X-OSINT-Token`. */
 export async function api(url, options = {}) {
   const tok = getApiToken();
   const baseHeaders = { "Content-Type": "application/json" };
@@ -114,6 +120,7 @@ export async function api(url, options = {}) {
   return data;
 }
 
+/** Envía formularios `FormData` multipart adjuntando `X-OSINT-Token`. */
 export async function apiFormData(url, formData) {
   const tok = getApiToken();
   const headers = tok ? { "X-OSINT-Token": tok } : {};
@@ -125,6 +132,7 @@ export async function apiFormData(url, formData) {
   return data;
 }
 
+/** Verifica que el usuario marcó la confirmación de uso legítimo OSINT. */
 export function requireConsent() {
   const chk = document.getElementById("globalConsent");
   const bar = chk.closest(".consent-bar");

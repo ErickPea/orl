@@ -12,6 +12,8 @@ from .ingest_repo import _upsert_interactant_conn
 # ---------------------------------------------------------------------------
 # Agente de Navegación Supervisada :: Runs y Bandeja de Revisión (Staging)
 # ---------------------------------------------------------------------------
+# Para qué sirve: registra una nueva ejecución del agente de navegación supervisada en SQLite.
+# Cómo funciona: inserta la fila inicial en `browser_agent_runs` (estado `running`) y retorna el registro recién creado.
 def create_browser_agent_run(
     case_id: str,
     platform: str,
@@ -19,6 +21,7 @@ def create_browser_agent_run(
     limits: Optional[dict] = None,
     run_id: Optional[str] = None,
 ) -> Optional[dict]:
+    """Crea un registro de ejecución del agente de navegación en `browser_agent_runs`."""
     if not case_exists(case_id):
         return None
     rid = run_id or uuid.uuid4().hex[:12]
@@ -47,6 +50,8 @@ def create_browser_agent_run(
     return get_browser_agent_run(rid)
 
 
+# Para qué sirve: actualiza progreso, logs (máx. 120 entradas), estado y cursor de reanudación de una corrida.
+# Cómo funciona: lee la fila actual, conserva campos no enviados y ejecuta `UPDATE browser_agent_runs`.
 def update_browser_agent_run(
     run_id: str,
     status: Optional[str] = None,
@@ -59,6 +64,7 @@ def update_browser_agent_run(
     resume_cursor: Optional[str] = None,
     finished: bool = False,
 ) -> Optional[dict]:
+    """Actualiza estado, progreso, logs y cursor de reanudación de una corrida del agente."""
     now = _now_iso()
     with _connect() as conn:
         row = conn.execute("SELECT * FROM browser_agent_runs WHERE id = ?", (run_id,)).fetchone()
@@ -88,6 +94,8 @@ def update_browser_agent_run(
     return get_browser_agent_run(run_id)
 
 
+# Para qué sirve: guarda un elemento recolectado en la bandeja temporal de revisión (`staging`) antes de integrarlo al caso.
+# Cómo funciona: inserta en `browser_staged_items` con `selected=1`, normaliza handles y serializa `payload_json`.
 def add_browser_staged_item(
     run_id: str,
     case_id: str,
@@ -100,6 +108,7 @@ def add_browser_staged_item(
     source_url: str = "",
     payload: Optional[dict] = None,
 ) -> Optional[dict]:
+    """Inserta un hallazgo en la bandeja temporal de revisión (`browser_staged_items`)."""
     now = _now_iso()
     with _connect() as conn:
         cur = conn.execute(
@@ -131,7 +140,10 @@ def add_browser_staged_item(
     return d
 
 
+# Para qué sirve: recupera una corrida del agente junto con todos sus ítems pendientes o aprobados en staging.
+# Cómo funciona: consulta `browser_agent_runs` + `browser_staged_items` y parsea los JSON de límites, stats, logs y payload.
 def get_browser_agent_run(run_id: str) -> Optional[dict]:
+    """Devuelve el detalle de una ejecución del agente junto con sus ítems en staging."""
     with _connect() as conn:
         row = conn.execute("SELECT * FROM browser_agent_runs WHERE id = ?", (run_id,)).fetchone()
         if not row:
@@ -153,7 +165,10 @@ def get_browser_agent_run(run_id: str) -> Optional[dict]:
     return d
 
 
+# Para qué sirve: enumera las últimas 20 ejecuciones del agente navegador pertenecientes a un caso.
+# Cómo funciona: consulta `browser_agent_runs` ordenadas por `started_at DESC` y deserializa sus campos JSON.
 def list_browser_agent_runs(case_id: str) -> list:
+    """Lista las ejecuciones del agente asociadas a `case_id`."""
     if not case_exists(case_id):
         return []
     with _connect() as conn:
@@ -171,7 +186,10 @@ def list_browser_agent_runs(case_id: str) -> list:
     return out
 
 
+# Para qué sirve: permite al analista marcar o desmarcar un ítem de staging antes de hacer el commit al caso.
+# Cómo funciona: actualiza la columna `selected` (`1` o `0`) en `browser_staged_items`.
 def update_staged_item_selection(run_id: str, item_id: int, selected: bool) -> bool:
+    """Marca o desmarca un elemento de staging para incluirlo en el commit al caso."""
     with _connect() as conn:
         cur = conn.execute(
             "UPDATE browser_staged_items SET selected = ? WHERE id = ? AND run_id = ?",
@@ -180,7 +198,10 @@ def update_staged_item_selection(run_id: str, item_id: int, selected: bool) -> b
         return cur.rowcount > 0
 
 
+# Para qué sirve: descarta definitivamente un elemento de la bandeja temporal antes de integrarlo al caso.
+# Cómo funciona: ejecuta `DELETE` sobre `browser_staged_items` filtrando por `id` y `run_id`.
 def delete_staged_item(run_id: str, item_id: int) -> bool:
+    """Elimina un ítem específico de `browser_staged_items` antes del commit."""
     with _connect() as conn:
         cur = conn.execute(
             "DELETE FROM browser_staged_items WHERE id = ? AND run_id = ?",
@@ -192,6 +213,8 @@ def delete_staged_item(run_id: str, item_id: int) -> bool:
 # ---------------------------------------------------------------------------
 # Módulos A, B y C :: Interactuantes, Friend Scan y Pistas de Ubicación Visual
 # ---------------------------------------------------------------------------
+# Para qué sirve: crea o actualiza un tercero interactuante deduplicado dentro del caso.
+# Cómo funciona: abre conexión si el caso existe y delega en `_upsert_interactant_conn`.
 def upsert_interactant(
     case_id: str,
     platform: str,
@@ -200,12 +223,15 @@ def upsert_interactant(
     profile_url: str = "",
     seen_at: str = "",
 ) -> Optional[int]:
+    """Crea o actualiza un interactuante nominal deduplicado y devuelve su `id`."""
     if not case_exists(case_id):
         return None
     with _connect() as conn:
         return _upsert_interactant_conn(conn, case_id, platform, handle, display_name, profile_url, seen_at)
 
 
+# Para qué sirve: lista todos los interactuantes del caso enriquecidos con conteo de comentarios, sentimiento, reciprocidad y cercanía visual.
+# Cómo funciona: cruza `interactants`, `comments` e `interactions`, calcula `is_friend_candidate` y ordena por relevancia.
 def list_case_interactants(case_id: str) -> list:
     """Devuelve interactuantes nominales del caso con métricas de comentarios y sentimiento."""
     if not case_exists(case_id):
@@ -274,6 +300,8 @@ def list_case_interactants(case_id: str) -> list:
     return out
 
 
+# Para qué sirve: selecciona qué interactuantes del caso califican para la pasada secundaria `friend-scan`.
+# Cómo funciona: filtra `list_case_interactants` por reciprocidad o `interactions_count >= thr` hasta `MAX_FRIEND_PROFILES`.
 def get_friend_candidate_handles(case_id: str, min_interactions: Optional[int] = None) -> list:
     """Devuelve interactuantes elegibles para `friend-scan` (≥ min_interactions o reciprocidad)."""
     thr = int(min_interactions if min_interactions is not None else (os.getenv("FRIEND_CANDIDATE_MIN_INTERACTIONS", "2") or 2))
@@ -283,6 +311,8 @@ def get_friend_candidate_handles(case_id: str, min_interactions: Optional[int] =
     return cands[:max_profiles]
 
 
+# Para qué sirve: registra un trabajo en cola para escanear una cuenta amiga candidata.
+# Cómo funciona: inserta la fila en `friend_scan_runs` con estado `'queued'` y `resume_cursor` del padre.
 def create_friend_scan_run(
     case_id: str,
     platform: str,
@@ -292,6 +322,7 @@ def create_friend_scan_run(
     parent_run_id: str = "",
     resume_cursor: str = "",
 ) -> Optional[dict]:
+    """Encola un escaneo secundario en `friend_scan_runs` para una cuenta candidata."""
     if not case_exists(case_id):
         return None
     now = _now_iso()
@@ -309,6 +340,8 @@ def create_friend_scan_run(
     return dict(row) if row else None
 
 
+# Para qué sirve: actualiza el avance, coincidencias visuales o error de un escaneo de cuenta amiga.
+# Cómo funciona: lee el registro por `scan_id`, mezcla los campos opcionales y ejecuta `UPDATE friend_scan_runs`.
 def update_friend_scan_run(
     scan_id: int,
     status: Optional[str] = None,
@@ -318,6 +351,7 @@ def update_friend_scan_run(
     error: Optional[str] = None,
     finished: bool = False,
 ) -> Optional[dict]:
+    """Actualiza estado, conteo de coincidencias visuales y cursor de un `friend_scan_run`."""
     now = _now_iso()
     with _connect() as conn:
         row = conn.execute("SELECT * FROM friend_scan_runs WHERE id = ?", (scan_id,)).fetchone()
@@ -341,7 +375,10 @@ def update_friend_scan_run(
     return dict(out) if out else None
 
 
+# Para qué sirve: lista todos los escaneos secundarios registrados para un caso en orden FIFO.
+# Cómo funciona: consulta `friend_scan_runs` filtrando por `case_id` ordenado por `id ASC`.
 def list_friend_scan_runs(case_id: str) -> list:
+    """Lista la cola histórica y actual de escaneos secundarios del caso."""
     if not case_exists(case_id):
         return []
     with _connect() as conn:
@@ -352,13 +389,19 @@ def list_friend_scan_runs(case_id: str) -> list:
     return [dict(r) for r in rows]
 
 
+# Para qué sirve: recupera un registro individual de `friend_scan_runs` por su ID numérico.
+# Cómo funciona: ejecuta `SELECT * FROM friend_scan_runs WHERE id = ?`.
 def get_friend_scan_run(scan_id: int) -> Optional[dict]:
+    """Obtiene el registro de un escaneo secundario por su `id`."""
     with _connect() as conn:
         row = conn.execute("SELECT * FROM friend_scan_runs WHERE id = ?", (scan_id,)).fetchone()
     return dict(row) if row else None
 
 
+# Para qué sirve: registra la máxima similitud visual `dHash` detectada sobre las aristas de un tercero.
+# Cómo funciona: actualiza `visual_proximity_score` usando `MAX(...)` en todas las filas de `interactions` del handle.
 def update_interaction_visual_score(case_id: str, handle: str, score: float) -> None:
+    """Actualiza el puntaje máximo de proximidad visual dHash en las interacciones de `handle`."""
     h = (handle or "").strip().lstrip("@").lower()
     if not case_id or not h:
         return

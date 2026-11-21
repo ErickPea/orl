@@ -40,17 +40,25 @@ PLATFORM_LOGIN_URLS = {
 }
 
 
+# Para qué sirve: verifica si el entorno virtual tiene instalado Playwright antes de lanzar el agente.
+# Cómo funciona: comprueba la existencia del módulo `playwright` mediante `importlib.util.find_spec`.
 def playwright_available() -> bool:
+    """Indica si el paquete `playwright` está disponible en el entorno."""
     return importlib.util.find_spec("playwright") is not None
 
 
+# Para qué sirve: obtiene y asegura la carpeta de perfil persistente para una plataforma.
+# Cómo funciona: normaliza el nombre de plataforma y crea `data/browser_profiles/<plat>` si no existe.
 def get_profile_dir(platform: str) -> Path:
+    """Devuelve y crea el directorio de perfil persistente del navegador para `platform`."""
     plat = (platform or "generic").strip().lower()
     p = BROWSER_PROFILES_DIR / plat
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
+# Para qué sirve: localiza el navegador real instalado para abrir sesiones de login sin flags de automatización.
+# Cómo funciona: revisa rutas estándar de Windows/Linux priorizando Microsoft Edge sobre Google Chrome.
 def _find_desktop_browser_exe() -> Optional[Path]:
     """Devuelve el ejecutable de Microsoft Edge (prioritario) o Chrome para login nativo sin flags de automatización."""
     edge_candidates = [
@@ -72,6 +80,8 @@ def _find_desktop_browser_exe() -> Optional[Path]:
     return None
 
 
+# Para qué sirve: selecciona el canal de navegador real (`msedge`/`chrome`) que usará Playwright.
+# Cómo funciona: lee `OSINT_BROWSER_CHANNEL` si está definida o comprueba qué ejecutables existen en el sistema.
 def _detect_browser_channel() -> Optional[str]:
     """
     Detecta un navegador de escritorio real instalado (Chrome o Edge) para evitar
@@ -99,6 +109,8 @@ def _detect_browser_channel() -> Optional[str]:
     return None
 
 
+# Para qué sirve: inicia un contexto persistente de navegador reutilizando cookies y sesión guardada.
+# Cómo funciona: lanza Edge/Chrome vía `launch_persistent_context` con `user_data_dir` y hace fallback a Chromium.
 def _launch_persistent_context(playwright_obj, profile_dir: Path, headless: bool = False):
     """Lanza el contexto persistente usando Chrome/Edge instalado si existe, o Chromium."""
     channel = _detect_browser_channel()
@@ -121,7 +133,10 @@ def _launch_persistent_context(playwright_obj, profile_dir: Path, headless: bool
     return playwright_obj.chromium.launch_persistent_context(**kwargs)
 
 
+# Para qué sirve: informa a la UI/API el estado actual de la sesión de navegador de una plataforma.
+# Cómo funciona: verifica Playwright, canal activo, presencia de archivos en el perfil y tamaño de caché en MB.
 def session_status(platform: str) -> dict:
+    """Resume disponibilidad de Playwright, sesión guardada y tamaño de caché para `platform`."""
     plat = (platform or "").strip().lower()
     pdir = BROWSER_PROFILES_DIR / plat
     has_cookies = pdir.is_dir() and any(pdir.iterdir())
@@ -138,6 +153,8 @@ def session_status(platform: str) -> dict:
     }
 
 
+# Para qué sirve: cierra la sesión guardada de una plataforma eliminando su perfil local completo.
+# Cómo funciona: borra recursivamente `data/browser_profiles/<platform>` con `shutil.rmtree`.
 def clear_platform_session(platform: str) -> bool:
     """Elimina el perfil/cookies locales de Chromium para una plataforma."""
     plat = (platform or "").strip().lower()
@@ -190,6 +207,8 @@ _PROTECTED_SESSION_NAMES = {
 }
 
 
+# Para qué sirve: calcula cuánto espacio ocupa en disco una carpeta del perfil del navegador.
+# Cómo funciona: suma `st_size` de todos los archivos encontrados con `rglob("*")` tolerando archivos bloqueados.
 def _safe_dir_size_bytes(path: Path) -> int:
     total = 0
     try:
@@ -204,6 +223,8 @@ def _safe_dir_size_bytes(path: Path) -> int:
     return total
 
 
+# Para qué sirve: localiza solo las subcarpetas de caché eliminables sin tocar datos de sesión.
+# Cómo funciona: recorre el perfil recursivamente recolectando `_SAFE_CACHE_DIR_NAMES`/`_SAFE_CACHE_SUBPATHS` y omitiendo `_PROTECTED_SESSION_NAMES`.
 def _collect_cache_targets(pdir: Path) -> list:
     """
     Recopila subcarpetas de caché seguras de eliminar dentro de un perfil de navegador,
@@ -214,6 +235,8 @@ def _collect_cache_targets(pdir: Path) -> list:
     targets = []
     seen = set()
 
+    # Para qué sirve: explorador recursivo interno que clasifica cada subdirectorio del perfil.
+    # Cómo funciona: agrega cachés seguras al vuelo, corta la bajada en carpetas protegidas y evita duplicados por ruta resuelta.
     def _walk(cur: Path, rel_parts: tuple) -> None:
         try:
             children = sorted(cur.iterdir(), key=lambda x: x.name)
@@ -243,6 +266,8 @@ def _collect_cache_targets(pdir: Path) -> list:
     return targets
 
 
+# Para qué sirve: mide el tamaño total del perfil y cuánto espacio corresponde a caché limpiable.
+# Cómo funciona: evalúa uno o todos los perfiles sumando `_safe_dir_size_bytes` por cada objetivo de `_collect_cache_targets`.
 def get_browser_cache_stats(platform: Optional[str] = None, profiles_dir: Optional[Path] = None) -> dict:
     """Devuelve tamaño total y tamaño de cachés limpiables para uno o todos los perfiles."""
     base = profiles_dir or BROWSER_PROFILES_DIR
@@ -279,6 +304,8 @@ def get_browser_cache_stats(platform: Optional[str] = None, profiles_dir: Option
     }
 
 
+# Para qué sirve: libera espacio eliminando cachés pesadas de Edge/Chromium sin borrar cookies ni sesiones.
+# Cómo funciona: bloquea si hay login/agente activo, verifica rutas dentro de `base` y borra (o simula si `dry_run=True`).
 def clean_browser_cache(
     platform: Optional[str] = None,
     dry_run: bool = False,
@@ -352,17 +379,23 @@ def clean_browser_cache(
 class RunControl:
     """Primitivas thread-safe para pausar, reanudar y cancelar un agente en ejecución."""
 
+    # Para qué sirve: inicializa las banderas de control thread-safe para una corrida del agente.
+    # Cómo funciona: crea `pause_event` activo (`set()`) y `cancel_event` apagado ligados al `run_id`.
     def __init__(self, run_id: str):
         self.run_id = run_id
         self.pause_event = threading.Event()
         self.pause_event.set()  # set() = activo; clear() = pausado
         self.cancel_event = threading.Event()
 
+    # Para qué sirve: detiene temporalmente la navegación para revisión o intervención manual del usuario.
+    # Cómo funciona: limpia `pause_event` y persiste estado `paused` o `paused_checkpoint` en SQLite.
     def pause(self, reason: str = "Pausado por el usuario", checkpoint: bool = False):
         self.pause_event.clear()
         st = "paused_checkpoint" if checkpoint else "paused"
         storage.update_browser_agent_run(self.run_id, status=st, step=reason, log=reason)
 
+    # Para qué sirve: reanuda una corrida pausada tras resolver un checkpoint o solicitud del usuario.
+    # Cómo funciona: vuelve a activar `pause_event` y registra estado `running` en SQLite.
     def resume(self):
         self.pause_event.set()
         storage.update_browser_agent_run(
@@ -372,6 +405,8 @@ class RunControl:
             log="Ejecución reanudada por el usuario.",
         )
 
+    # Para qué sirve: solicita la detención definitiva de la investigación en curso.
+    # Cómo funciona: activa `cancel_event`, libera `pause_event` por si estaba bloqueado y marca `cancelled` en BD.
     def cancel(self):
         self.cancel_event.set()
         self.pause_event.set()  # desbloquear si estaba pausado
@@ -383,10 +418,14 @@ class RunControl:
             finished=True,
         )
 
+    # Para qué sirve: guarda el punto de avance para poder retomar el perfil principal tras un friend-scan.
+    # Cómo funciona: persiste `cursor_url` en la columna `resume_cursor` del run en SQLite.
     def save_cursor(self, cursor_url: str):
         """Persiste la última URL/cursor procesado para poder reanudar tras una pasada secundaria."""
         storage.update_browser_agent_run(self.run_id, resume_cursor=str(cursor_url or ""))
 
+    # Para qué sirve: mantiene el hilo trabajador en espera mientras el usuario o un checkpoint pausen el agente.
+    # Cómo funciona: sondea `pause_event` cada 0.25 s y devuelve `False` inmediatamente si se canceló.
     def wait_if_paused(self) -> bool:
         """Bloquea mientras esté pausado. Devuelve False si se canceló."""
         while not self.pause_event.is_set():
@@ -395,6 +434,8 @@ class RunControl:
             time.sleep(0.25)
         return not self.cancel_event.is_set()
 
+    # Para qué sirve: introduce pausas humanas aleatorias entre acciones DOM sin perder capacidad de respuesta.
+    # Cómo funciona: divide la espera `random.uniform` en micro-pasos de 0.25 s verificando pausa/cancelación.
     def human_delay(self, min_sec: float = 1.4, max_sec: float = 3.0) -> bool:
         """Espera humana respetuosa con cancelación y pausa inmediatas."""
         total = random.uniform(min_sec, max_sec)
@@ -413,11 +454,16 @@ _ACTIVE_CONTROLS: dict = {}  # run_id -> RunControl
 _LOGIN_SESSIONS: dict = {}   # platform -> {"thread": Thread, "stop": Event}
 
 
+# Para qué sirve: obtiene el controlador en memoria de una corrida activa para pausarla o cancelarla desde la API.
+# Cómo funciona: consulta `_ACTIVE_CONTROLS[run_id]` bajo `_CTRL_LOCK`.
 def get_run_control(run_id: str) -> Optional[RunControl]:
+    """Devuelve el controlador activo (`RunControl`) de una ejecución en curso."""
     with _CTRL_LOCK:
         return _ACTIVE_CONTROLS.get(run_id)
 
 
+# Para qué sirve: abre una ventana interactiva del navegador para que el usuario inicie sesión manualmente en la red social.
+# Cómo funciona: cierra sesiones de login previas de esa red y lanza Edge/Chrome nativo (sin automatización) o Playwright sobre el perfil persistente.
 def open_interactive_login_window(platform: str) -> dict:
     """
     Abre una ventana real de Microsoft Edge (sin flags de automatización) usando
@@ -475,6 +521,8 @@ def open_interactive_login_window(platform: str) -> dict:
 
     stop_ev = threading.Event()
 
+    # Para qué sirve: hilo de respaldo con Playwright cuando no hay Edge/Chrome nativo para abrir el login manual.
+    # Cómo funciona: abre el perfil persistente en `login_url` y espera hasta cerrar las pestañas o recibir `stop_ev`.
     def _login_worker():
         from playwright.sync_api import sync_playwright
 
@@ -508,6 +556,8 @@ def open_interactive_login_window(platform: str) -> dict:
     }
 
 
+# Para qué sirve: inicia en segundo plano una investigación supervisada en navegador con control en vivo y staging.
+# Cómo funciona: valida caso/límites, cierra ventanas de login abiertas, crea `RunControl` y lanza `_worker` en un hilo daemon.
 def start_browser_investigation(
     case_id: str,
     platform: str,
@@ -561,6 +611,8 @@ def start_browser_investigation(
                     pass
             time.sleep(0.8)
 
+    # Para qué sirve: ejecuta el adaptador Playwright de forma asíncrona y actualiza estado/errores en SQLite.
+    # Cómo funciona: abre el perfil persistente, pasa `_emit_staged` y `_check_security_gate` al adaptador y limpia `_ACTIVE_CONTROLS` al terminar.
     def _worker():
         from playwright.sync_api import sync_playwright
 
@@ -571,6 +623,8 @@ def start_browser_investigation(
                 ctx = _launch_persistent_context(p, profile_dir, headless=limits["headless"])
                 page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
+                # Para qué sirve: recibe cada hallazgo del adaptador, lo enriquece en vivo y lo guarda en staging.
+                # Cómo funciona: evalúa sentimiento y señal relacional preliminar si hay texto y lo inserta en `browser_staged_items`.
                 def _emit_staged(kind: str, author: str, target: str, content: str, pub_at: str, src_url: str, payload: dict):
                     # Enriquecimiento en vivo (sentimiento + señal relacional preliminar)
                     enriched = dict(payload or {})
@@ -610,6 +664,8 @@ def start_browser_investigation(
                     elif kind == "media":
                         stats["media"] += 1
 
+                # Para qué sirve: frena al agente ante muros de login, 2FA o CAPTCHAs sin intentar evadirlos.
+                # Cómo funciona: llama a `adapter.detect_security_or_login_gate` y pausa con `checkpoint=True` esperando acción humana.
                 def _check_security_gate() -> bool:
                     """Si hay CAPTCHA, checkpoint o login wall, pausa para acción humana (NO evade)."""
                     gate = adapter.detect_security_or_login_gate(page)
@@ -680,6 +736,8 @@ def start_browser_investigation(
     return run_rec
 
 
+# Para qué sirve: consolida los ítems aprobados por el analista desde la bandeja temporal (`staging`) hacia el caso en SQLite.
+# Cómo funciona: filtra `selected == 1`, construye un `ConnectorBundle` normalizado con interactuantes/aristas, ingesta y dispara Relacional, NLP y SNA.
 def commit_staged_run_to_case(
     run_id: str,
     run_relational: bool = True,
@@ -839,6 +897,8 @@ class FriendScanStateMachine:
            -> (PAUSED_CHECKPOINT) -> RESUMING -> SCANNING_PRIMARY_RESUME -> DONE
     """
 
+    # Para qué sirve: inicializa la máquina de estados y eventos de control para la pasada secundaria de amigos.
+    # Cómo funciona: fija `state="IDLE"`, cola vacía, cursor de reanudación y eventos `pause_event`/`cancel_event`.
     def __init__(self, case_id: str, parent_run_id: str = "", platform: str = "instagram"):
         self.case_id = case_id
         self.parent_run_id = parent_run_id
@@ -851,22 +911,32 @@ class FriendScanStateMachine:
         self.pause_event.set()
         self.cancel_event = threading.Event()
 
+    # Para qué sirve: cambia el estado formal actual de la máquina de estados.
+    # Cómo funciona: asigna `self.state = new_state`.
     def transition(self, new_state: str):
         self.state = new_state
 
+    # Para qué sirve: detiene la cola de amigos ante solicitud manual o bloqueo de seguridad.
+    # Cómo funciona: limpia `pause_event` y cambia a `PAUSED_CHECKPOINT` o `PAUSED`.
     def pause(self, checkpoint: bool = False):
         self.pause_event.clear()
         self.state = "PAUSED_CHECKPOINT" if checkpoint else "PAUSED"
 
+    # Para qué sirve: reanuda la cola tras resolver un checkpoint o pausa.
+    # Cómo funciona: reactiva `pause_event` y transiciona a `RESUMING`.
     def resume(self):
         self.pause_event.set()
         self.state = "RESUMING"
 
+    # Para qué sirve: cancela de forma definitiva la cola pendiente de cuentas amigas.
+    # Cómo funciona: activa `cancel_event`, desbloquea `pause_event` y fija `state = "CANCELLED"`.
     def cancel(self):
         self.cancel_event.set()
         self.pause_event.set()
         self.state = "CANCELLED"
 
+    # Para qué sirve: arma la cola FIFO de cuentas amigas elegibles en SQLite hasta el tope configurado.
+    # Cómo funciona: normaliza handles, deduce URL pública si falta, limita a `MAX_FRIEND_PROFILES` y crea `friend_scan_runs`.
     def build_queue(self, candidates: list, max_profiles: Optional[int] = None) -> list:
         limit = int(max_profiles if max_profiles is not None else (os.getenv("MAX_FRIEND_PROFILES", "10") or 10))
         self.transition("QUEUING_FRIENDS")
@@ -895,6 +965,8 @@ class FriendScanStateMachine:
                 self.queue.append(scan_rec)
         return self.queue
 
+    # Para qué sirve: marca el retorno al perfil principal tras concluir la cola de amigos.
+    # Cómo funciona: registra en `parent_run_id` desde qué `resume_cursor` continúa y termina la FSM en `DONE`.
     def mark_primary_resume(self) -> dict:
         self.transition("SCANNING_PRIMARY_RESUME")
         if self.parent_run_id:
@@ -911,6 +983,8 @@ class FriendScanStateMachine:
 _FRIEND_SCANS: dict = {}  # parent_key -> FriendScanStateMachine
 
 
+# Para qué sirve: consolida coincidencias visuales (`dHash`) e historial cronológico compartido con cuentas amigas.
+# Cómo funciona: compara media sujeto vs. amigo, refuerza `visual_proximity_score` (`min(100, pares*28)`) y ordena posts/comentarios/fotos por fecha.
 def get_case_friend_evidence(case_id: str) -> dict:
     """
     Devuelve evidencia visual coincidente (dHash entre sujeto y cuentas amigas),
@@ -1017,6 +1091,8 @@ def get_case_friend_evidence(case_id: str) -> dict:
     }
 
 
+# Para qué sirve: lanza la pasada secundaria autorizada (`authorized=True`) sobre cuentas amigas candidatas.
+# Cómo funciona: construye la cola con `FriendScanStateMachine`, navega cada amigo pausando ante CAPTCHA/login y al final retoma `resume_cursor`.
 def start_friend_scan_queue(
     case_id: str,
     authorized: bool = False,
@@ -1059,6 +1135,8 @@ def start_friend_scan_queue(
     with _CTRL_LOCK:
         _FRIEND_SCANS[scan_key] = fsm
 
+    # Para qué sirve: procesa en segundo plano la cola de cuentas amigas y retoma el perfil principal al acabar.
+    # Cómo funciona: recorre `queue` en una sola sesión Playwright, frena ante bloqueos con `fsm.pause(checkpoint=True)` y actualiza cada `friend_scan_run`.
     def _friend_worker():
         from modules.browser_adapters import get_browser_adapter
         from modules.vision_analysis import compare_media_between_profiles
@@ -1088,6 +1166,8 @@ def start_friend_scan_queue(
 
                     gate_hit = {"reason": ""}
 
+                    # Para qué sirve: detiene la cola de amigos si la red muestra CAPTCHA, checkpoint o login-wall.
+                    # Cómo funciona: inspecciona la página y pasa la FSM a `paused_checkpoint` devolviendo `False`.
                     def _check_gate():
                         r = adapter.detect_security_or_login_gate(page)
                         if r:
@@ -1099,6 +1179,8 @@ def start_friend_scan_queue(
 
                     staged_items = []
 
+                    # Para qué sirve: acumula los hallazgos extraídos del amigo marcando su `owner_handle`.
+                    # Cómo funciona: añade el dueño al `payload` y guarda la tupla en `staged_items` para conteo.
                     def _emit(kind, author, target, content, pub_at, src_url, payload):
                         pl = dict(payload or {})
                         pl["owner_handle"] = sc["target_handle"]
@@ -1165,6 +1247,8 @@ def start_friend_scan_queue(
     }
 
 
+# Para qué sirve: captura de forma aislada el perfil y contenido público de un amigo agregado manualmente por URL.
+# Cómo funciona: abre Playwright con el adaptador, encapsula datos en un bundle `owner_type='friend'` y marca `pending_manual` ante bloqueos.
 def crawl_single_friend_profile(
     case_id: str,
     friend_id: int,
@@ -1196,13 +1280,19 @@ def crawl_single_friend_profile(
     gate_reason = {"text": ""}
 
     class _SimpleCtrl:
+        # Para qué sirve: mantiene compatibilidad con el adaptador indicando que la corrida no está pausada.
+        # Cómo funciona: devuelve `True` inmediato en esta captura sincrónica corta.
         def wait_if_paused(self):
             return True
 
+        # Para qué sirve: aplica una pausa breve entre acciones DOM durante la captura del amigo.
+        # Cómo funciona: duerme hasta `min(1.5, a)` segundos y devuelve `True`.
         def human_delay(self, a=1.0, b=1.8):
             time.sleep(min(1.5, float(a)))
             return True
 
+    # Para qué sirve: distribuye perfil, posts y media extraídos en el bundle aislado del amigo.
+    # Cómo funciona: etiqueta cada entrada con `owner_type='friend'` y `owner_id=friend_id`.
     def _emit(kind, author, target, content, pub_at, src_url, payload):
         pl = dict(payload or {})
         if kind == "profile":
@@ -1239,6 +1329,8 @@ def crawl_single_friend_profile(
         ctx = _launch_persistent_context(p, profile_dir, headless=headless)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
+        # Para qué sirve: detiene la captura del amigo si aparece un muro de login o CAPTCHA.
+        # Cómo funciona: guarda el motivo en `gate_reason["text"]` y retorna `False` para cortar el adaptador.
         def _check_gate():
             r = adapter.detect_security_or_login_gate(page)
             if r:

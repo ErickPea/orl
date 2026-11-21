@@ -7,6 +7,7 @@ import { openAgentView } from "./agent.js";
 // ---------------------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------------------
+/** Cambia la vista activa de la SPA y dispara su carga inicial correspondiente. */
 export function switchView(name) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
@@ -40,6 +41,7 @@ export function switchView(name) {
 // ---------------------------------------------------------------------------
 // Carga de estado e historial
 // ---------------------------------------------------------------------------
+/** Consulta `/api/status` y actualiza contadores y disponibilidad de herramientas. */
 export async function loadStatus() {
   try {
     const data = await api("/api/status");
@@ -81,6 +83,7 @@ export async function loadStatus() {
   }
 }
 
+/** Actualiza la insignia de trabajos en ejecución en la barra superior. */
 export function updateActiveJobsBadge(count) {
   const pill = document.getElementById("activeJobsPill");
   const dot = pill.querySelector(".dot");
@@ -94,6 +97,7 @@ export function updateActiveJobsBadge(count) {
   }
 }
 
+/** Carga el historial de carpetas de reportes generadas en `output/`. */
 export async function loadReports() {
   try {
     const data = await api("/api/reports");
@@ -107,6 +111,7 @@ export async function loadReports() {
   }
 }
 
+/** Renderiza la lista filtrable de reportes en el contenedor indicado. */
 export function renderReportsList(containerId, items) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -141,6 +146,7 @@ export function renderReportsList(containerId, items) {
 // ---------------------------------------------------------------------------
 // Polling de jobs asíncronos + barra de progreso en vivo
 // ---------------------------------------------------------------------------
+/** Inicia el polling periódico de `/api/jobs/{jobId}` hasta finalizar y refresca vistas. */
 export function startJobPolling(jobId, viewKey, onDone) {
   const progEl = document.getElementById(`progress-${viewKey}`);
   const resEl = document.getElementById(`results-${viewKey}`);
@@ -185,6 +191,7 @@ export function startJobPolling(jobId, viewKey, onDone) {
   state.activePollers[viewKey] = setInterval(poll, 1600);
 }
 
+/** Dibuja barra de progreso y bitácora en vivo de un job asíncrono. */
 export function renderProgress(container, job) {
   const badgeClass = job.status === "done" ? "badge-alta" : job.status === "error" ? "badge-baja" : "badge-info";
   const label = job.status === "done" ? "COMPLETADO" : job.status === "error" ? "ERROR" : "EN CURSO";
@@ -206,6 +213,7 @@ export function renderProgress(container, job) {
   `;
 }
 
+/** Renderiza enlaces de descarga para HTML, PDF, CSV y JSON generados. */
 export function renderDownloadBar(files) {
   const destacados = files.filter((f) =>
     ["resumen.html", "reporte_final.pdf", "resumen_consolidado.csv", "redes_sociales.csv", "busqueda_nombre.csv", "correos_encontrados.csv", "brechas_detectadas.csv", "telefono_servicios.csv", "metadatos.json"].includes(f.name)

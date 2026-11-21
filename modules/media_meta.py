@@ -51,6 +51,8 @@ _AUTHOR_KEYS = ("artist", "author", "copyright", "dc creator", "ownername", "cam
 _DATE_KEYS = ("datetimeoriginal", "datetimedigitized", "datetime", "creation_time", "xmp createdate", "com.apple.quicktime.creationdate")
 
 
+# Para qué sirve: informa qué utilidades de análisis multimedia están instaladas en el equipo.
+# Cómo funciona: verifica el flag `PILLOW_OK` y la disponibilidad en PATH de `ffprobe` y `exiftool`.
 def media_capabilities() -> dict:
     """Indica qué motores de análisis multimedia están disponibles en el sistema."""
     return {
@@ -60,6 +62,8 @@ def media_capabilities() -> dict:
     }
 
 
+# Para qué sirve: convierte un tamaño en bytes a un formato legible (`B`, `KB`, `MB`, `GB`).
+# Cómo funciona: divide sucesivamente entre 1024.0 hasta encontrar la unidad adecuada.
 def _human_size(num_bytes: int) -> str:
     size = float(num_bytes)
     for unit in ("B", "KB", "MB", "GB"):
@@ -69,6 +73,8 @@ def _human_size(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 
+# Para qué sirve: calcula huellas criptográficas únicas del archivo multimedia para integridad y deduplicación.
+# Cómo funciona: lee el archivo por bloques de 64 KB actualizando objetos `hashlib.sha256` y `md5`.
 def _compute_hashes(path: Path) -> dict:
     """Calcula SHA-256 y MD5 por bloques (seguro para archivos grandes como videos)."""
     h_sha256 = hashlib.sha256()
@@ -80,6 +86,8 @@ def _compute_hashes(path: Path) -> dict:
     return {"sha256": h_sha256.hexdigest(), "md5": h_md5.hexdigest()}
 
 
+# Para qué sirve: normaliza valores racionales de etiquetas EXIF a números flotantes estándar.
+# Cómo funciona: divide `(num, den)` cuando recibe una tupla (evitando división por cero) o convierte directo con `float`.
 def _to_float(val) -> float:
     """Convierte racionales EXIF (IFDRational, tuplas (num, den), int/float) a float."""
     if isinstance(val, tuple) and len(val) == 2:
@@ -87,6 +95,8 @@ def _to_float(val) -> float:
     return float(val)
 
 
+# Para qué sirve: empaqueta coordenadas decimales con enlaces directos de mapa para verificación visual.
+# Cómo funciona: redondea latitud/longitud a 6 decimales y construye URLs de OpenStreetMap y Google Maps.
 def _gps_links(lat: float, lon: float, altitude: float = None) -> dict:
     lat_r = round(float(lat), 6)
     lon_r = round(float(lon), 6)
@@ -101,6 +111,8 @@ def _gps_links(lat: float, lon: float, altitude: float = None) -> dict:
     return out
 
 
+# Para qué sirve: transforma el sub-IFD GPS en grados/minutos/segundos a coordenadas decimales utilizables.
+# Cómo funciona: aplica `d + m/60 + s/3600`, ajusta signo por hemisferio (`S`/`W`) y calcula altitud opcional.
 def _parse_exif_gps(gps_ifd: dict) -> dict:
     """Convierte el sub-IFD GPS de EXIF (grados/minutos/segundos) a latitud y longitud decimal."""
     if not gps_ifd:
@@ -132,6 +144,8 @@ def _parse_exif_gps(gps_ifd: dict) -> dict:
         return {}
 
 
+# Para qué sirve: extrae coordenadas geográficas embebidas en metadatos QuickTime/MP4 en formato ISO 6709.
+# Cómo funciona: busca patrones `+/-lat+/-lon` con `_ISO6709_RE`, valida rangos terrestres y genera `_gps_links`.
 def parse_iso6709_location(text: str) -> dict:
     """Parsea cadenas GPS ISO 6709 de videos (ej. '+04.7110-074.0721+2600.0/')."""
     if not text:
@@ -150,6 +164,8 @@ def parse_iso6709_location(text: str) -> dict:
         return {}
 
 
+# Para qué sirve: sanea cualquier valor EXIF crudo (bytes, tuplas, nulos) a texto truncado seguro para reportes.
+# Cómo funciona: decodifica bytes UTF-8 (o resume su longitud), aplana listas/tuplas y recorta a 240 chars.
 def _clean_value(val) -> str:
     """Normaliza valores EXIF/binarios a texto legible para reportes JSON/HTML."""
     if isinstance(val, bytes):
@@ -163,6 +179,8 @@ def _clean_value(val) -> str:
     return str(val).strip("\x00 ")[:240]
 
 
+# Para qué sirve: rescata etiquetas XMP (herramienta de edición, fechas, autor) embebidas en imágenes.
+# Cómo funciona: ubica el bloque `<x:xmpmeta>...</x:xmpmeta>` en los bytes y aplica `_XMP_PATTERNS`.
 def _extract_xmp_from_bytes(raw_bytes: bytes) -> dict:
     """Busca paquetes XML XMP embebidos en los bytes del archivo."""
     out = {}
@@ -179,6 +197,8 @@ def _extract_xmp_from_bytes(raw_bytes: bytes) -> dict:
     return out
 
 
+# Para qué sirve: extrae propiedades técnicas, EXIF completo, coordenadas GPS y XMP de una imagen local.
+# Cómo funciona: abre con Pillow (`img.getexif()`, sub-IFDs `0x8769`/`0x8825`, `img.info`) y escanea los primeros 512 KB buscando XMP.
 def _inspect_image(path: Path) -> dict:
     """Extrae información técnica, EXIF, GPS y XMP de una imagen con Pillow."""
     res = {"technical": {}, "metadata": {}, "gps": {}, "engine": ["pillow"]}
@@ -247,6 +267,8 @@ def _inspect_image(path: Path) -> dict:
     return res
 
 
+# Para qué sirve: extrae metadatos de contenedor, pistas de video/audio y ubicación ISO 6709 de un video usando `ffprobe`.
+# Cómo funciona: invoca `ffprobe -print_format json -show_format -show_streams` y parsea duración, bitrate, códecs y tags GPS.
 def _inspect_video_ffprobe(path: Path) -> dict:
     """Usa `ffprobe` para extraer metadatos completos de contenedor, streams y GPS de un video."""
     ffprobe = shutil.which("ffprobe")
@@ -318,6 +340,8 @@ def _inspect_video_ffprobe(path: Path) -> dict:
     return {"technical": technical, "metadata": metadata, "gps": gps, "engine": ["ffprobe"]}
 
 
+# Para qué sirve: rescata metadatos básicos de videos MP4/MOV cuando `ffprobe` no está instalado.
+# Cómo funciona: lee cabecera y cola (512 KB c/u) buscando átomos binarios `ftyp`, `mvhd` (fecha QuickTime 1904) y `©xyz` (GPS).
 def _inspect_video_mp4_fallback(path: Path) -> dict:
     """
     Respaldo ligero en Python puro para archivos MP4/MOV cuando `ffprobe` no está disponible:
@@ -365,6 +389,8 @@ def _inspect_video_mp4_fallback(path: Path) -> dict:
     return {"technical": technical, "metadata": metadata, "gps": gps, "engine": ["mp4_python_fallback"]}
 
 
+# Para qué sirve: complementa los metadatos con etiquetas avanzadas usando `exiftool` si está instalado.
+# Cómo funciona: ejecuta `exiftool -j -n` con timeout de 25 s y limpia campos de ruta local del sistema.
 def _run_exiftool_optional(path: Path) -> dict:
     """Si `exiftool` está instalado, complementa la extracción con etiquetas avanzadas."""
     exe = shutil.which("exiftool")
@@ -384,6 +410,8 @@ def _run_exiftool_optional(path: Path) -> dict:
         return {}
 
 
+# Para qué sirve: evalúa qué datos sensibles expone el archivo (GPS, cámara, software, autor, fecha) y su nivel de riesgo.
+# Cómo funciona: busca claves conocidas en `metadata`, clasifica riesgo en `ALTO`/`MODERADO`/`BAJO` y sugiere mitigaciones.
 def _build_media_privacy(result: dict) -> dict:
     """Evalúa qué información sensible expone el archivo multimedia."""
     meta = result.get("metadata") or {}
@@ -441,6 +469,8 @@ def _build_media_privacy(result: dict) -> dict:
     }
 
 
+# Para qué sirve: genera una copia sanitizada de una imagen sin metadatos EXIF, GPS, XMP ni comentarios.
+# Cómo funciona: corrige orientación con `exif_transpose`, copia solo los píxeles a una imagen nueva y la guarda en `dst_path`.
 def strip_image_metadata(src_path: Path, dst_path: Path) -> bool:
     """
     Crea una copia limpia de una imagen eliminando EXIF, GPS, XMP y comentarios,
@@ -467,6 +497,8 @@ def strip_image_metadata(src_path: Path, dst_path: Path) -> bool:
         return False
 
 
+# Para qué sirve: orquesta la inspección forense/OSINT completa de cualquier imagen o video local.
+# Cómo funciona: identifica tipo por extensión/MIME, calcula hashes, ejecuta extractor Pillow o `ffprobe`/MP4 + ExifTool y genera copia limpia opcional.
 def inspect_media(path: Path, original_name: str = None, generate_clean_copy: bool = True,
                   out_dir: Path = None) -> dict:
     """
@@ -538,6 +570,8 @@ def inspect_media(path: Path, original_name: str = None, generate_clean_copy: bo
     return result
 
 
+# Para qué sirve: estructura el resultado de `inspect_media` en secciones legibles para reportes HTML y PDF.
+# Cómo funciona: organiza resumen técnico/hashes, evaluación de privacidad, enlace GPS (si existe) y listado ordenado de metadatos.
 def format_media_report(res: dict) -> dict:
     """Formatea el resultado de `inspect_media` en secciones listas para HTML y PDF."""
     priv = res.get("privacy") or {}

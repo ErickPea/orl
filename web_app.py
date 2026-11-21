@@ -170,9 +170,13 @@ _SPA_CSP = (
 class SecurityAndCsrfMiddleware:
     """Middleware ASGI puro para cabeceras CSP/seguridad, anti-CSRF y token de sesión local."""
 
+    # Para qué sirve: Inicializa el middleware envolviendo la aplicación ASGI subyacente.
+    # Cómo funciona: Almacena la referencia `asgi_app` en `self.app`.
     def __init__(self, asgi_app):
         self.app = asgi_app
 
+    # Para qué sirve: Intercepta peticiones HTTP entrantes para validar token API, protección CSRF e inyectar cabeceras seguras.
+    # Cómo funciona: Verifica `X-OSINT-Token`/Bearer y origen cross-site en `/api/` y envuelve `send` con `send_with_security_headers`.
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
@@ -227,6 +231,8 @@ class SecurityAndCsrfMiddleware:
                     await resp(scope, receive, send)
                     return
 
+        # Para qué sirve: Añade cabeceras de seguridad HTTP y política CSP a la respuesta saliente.
+        # Cómo funciona: Al recibir `http.response.start`, agrega `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y `CSP` si no existen.
         async def send_with_security_headers(message):
             if message.get("type") == "http.response.start":
                 hdrs = list(message.get("headers") or [])

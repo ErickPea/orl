@@ -40,6 +40,8 @@ _STATE_TTL_SECONDS = 600
 # ---------------------------------------------------------------------------
 # 1. Cifrado autenticado en reposo (sin dependencias externas obligatorias)
 # ---------------------------------------------------------------------------
+# Para qué sirve: cifra la clave secreta local en Windows ligándola a la sesión del usuario del sistema operativo.
+# Cómo funciona: invoca `CryptProtectData` vía `ctypes.windll.crypt32` (devuelve `None` fuera de Windows).
 def _dpapi_protect(raw_bytes: bytes) -> Optional[bytes]:
     """Protege bytes con Windows DPAPI (vinculado al usuario actual del SO)."""
     if os.name != "nt":
@@ -67,6 +69,8 @@ def _dpapi_protect(raw_bytes: bytes) -> Optional[bytes]:
         return None
 
 
+# Para qué sirve: descifra la clave maestra almacenada con Windows DPAPI al leer `data/.token_key`.
+# Cómo funciona: llama a `CryptUnprotectData` sobre los bytes protegidos y libera el buffer con `LocalFree`.
 def _dpapi_unprotect(enc_bytes: bytes) -> Optional[bytes]:
     """Descifra bytes protegidos con Windows DPAPI."""
     if os.name != "nt":
@@ -94,6 +98,8 @@ def _dpapi_unprotect(enc_bytes: bytes) -> Optional[bytes]:
         return None
 
 
+# Para qué sirve: obtiene o genera la clave maestra de 256 bits para cifrar tokens OAuth2 en reposo.
+# Cómo funciona: usa `OSINT_TOKEN_SECRET` si existe; si no, lee/crea `data/.token_key` protegido con DPAPI en Windows.
 def _get_master_key() -> bytes:
     env_secret = os.environ.get("OSINT_TOKEN_SECRET", "").strip()
     if env_secret:
@@ -120,6 +126,8 @@ def _get_master_key() -> bytes:
     return hashlib.sha256(raw_secret).digest()
 
 
+# Para qué sirve: genera el flujo pseudoaleatorio de cifrado por bloques sin requerir paquetes criptográficos externos.
+# Cómo funciona: encadena bloques `SHA-256(key + nonce + counter)` en modo CTR hasta cubrir `length` bytes.
 def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
     out = bytearray()
     counter = 0
@@ -130,6 +138,8 @@ def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
     return bytes(out[:length])
 
 
+# Para qué sirve: cifra y autentica un payload de tokens OAuth2 antes de guardarlo en SQLite.
+# Cómo funciona: deriva subclaves de cifrado y MAC, aplica XOR con `_keystream`, firma con HMAC-SHA256 y prefija `v1:`.
 def encrypt_token_payload(payload: dict) -> str:
     """Cifra y autentica (Encrypt-then-MAC) un diccionario de tokens OAuth2."""
     master = _get_master_key()
@@ -145,6 +155,8 @@ def encrypt_token_payload(payload: dict) -> str:
     return blob.decode("ascii")
 
 
+# Para qué sirve: verifica la integridad y descifra un token OAuth2 almacenado como `v1:...`.
+# Cómo funciona: valida la firma HMAC en tiempo constante (`hmac.compare_digest`), revierte el XOR y parsea JSON.
 def decrypt_token_payload(token_encrypted: str) -> Optional[dict]:
     """Verifica la autenticidad HMAC y descifra el payload de tokens OAuth2."""
     if not token_encrypted or not token_encrypted.startswith("v1:"):
@@ -171,6 +183,8 @@ def decrypt_token_payload(token_encrypted: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # 2. Configuración OAuth2 por plataforma (Meta Graph y Reddit)
 # ---------------------------------------------------------------------------
+# Para qué sirve: informa qué proveedores OAuth2 (Meta/Reddit) tienen credenciales configuradas en el entorno.
+# Cómo funciona: verifica pares de variables `META_APP_ID`/`SECRET` y `REDDIT_CLIENT_ID`/`SECRET` junto a sus scopes.
 def oauth_provider_status() -> dict:
     """Indica qué proveedores OAuth2 tienen Client ID y Secret configurados en `.env`."""
     meta_id = os.environ.get("META_APP_ID", "").strip()
@@ -196,6 +210,8 @@ def oauth_provider_status() -> dict:
     }
 
 
+# Para qué sirve: purga estados OAuth2 temporales vencidos para evitar acumulación en memoria.
+# Cómo funciona: elimina entradas de `_PENDING_STATES` que superen `_STATE_TTL_SECONDS` (600 s).
 def _cleanup_states() -> None:
     now = time.time()
     expired = [k for k, v in _PENDING_STATES.items() if now - v["created_at"] > _STATE_TTL_SECONDS]
@@ -203,6 +219,8 @@ def _cleanup_states() -> None:
         _PENDING_STATES.pop(k, None)
 
 
+# Para qué sirve: inicia el flujo OAuth2 oficial generando la URL de consentimiento para Meta o Reddit.
+# Cómo funciona: crea `state` anti-CSRF y `code_verifier`/PKCE S256, los guarda en `_PENDING_STATES` y construye la URL.
 def start_oauth_flow(platform: str, base_callback_url: str) -> dict:
     """
     Genera la URL oficial de autorización OAuth2 con `state` anti-CSRF y PKCE (S256).
@@ -255,6 +273,8 @@ def start_oauth_flow(platform: str, base_callback_url: str) -> dict:
     return {"platform": plat, "auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
 
 
+# Para qué sirve: completa el callback OAuth2 intercambiando `code` por el token oficial y guardándolo cifrado.
+# Cómo funciona: valida `state` en `_PENDING_STATES`, pide token + perfil `/me` a Meta/Reddit, cifra con `encrypt_token_payload` y persiste en SQLite.
 def complete_oauth_callback(platform: str, code: str, state: str, timeout: int = 15) -> dict:
     """
     Valida `state` anti-CSRF, intercambia `code` por token oficial y guarda la conexión cifrada.
@@ -350,6 +370,8 @@ def complete_oauth_callback(platform: str, code: str, state: str, timeout: int =
     )
 
 
+# Para qué sirve: recupera y descifra el `access_token` vigente para que un conector autorizado haga peticiones.
+# Cómo funciona: busca el secreto por `conn_id` o la primera conexión de `platform` y lo descifra con `decrypt_token_payload`.
 def get_valid_access_token(platform: str, conn_id: Optional[str] = None) -> tuple:
     """
     Recupera y descifra el token OAuth2 vigente para la plataforma o conexión indicada.

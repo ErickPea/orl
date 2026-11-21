@@ -18,6 +18,8 @@ from modules.connectors.common import (
 )
 
 
+# Para qué sirve: separa un handle o URL del Fediverso en tupla `(username, instance_host)`.
+# Cómo funciona: extrae host y usuario de URLs o cadenas `user@host`, usando `mastodon.social` por defecto.
 def _parse_mastodon_handle(raw: str) -> tuple:
     """Devuelve (username, instance_host). Por defecto usa `mastodon.social` si no se indica instancia."""
     val = (raw or "").strip()
@@ -36,6 +38,8 @@ def _parse_mastodon_handle(raw: str) -> tuple:
     return cleaned.strip(), "mastodon.social"
 
 
+# Para qué sirve: extrae perfil, campos verificados, estados, adjuntos, respuestas y favoritos en Mastodon.
+# Cómo funciona: consulta `/api/v1/accounts/lookup`, `/statuses`, `/context` y `/favourited_by` limpiando HTML con `html_to_text`.
 def fetch_mastodon(
     handle: str,
     limit: int = 25,

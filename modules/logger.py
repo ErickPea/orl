@@ -18,6 +18,8 @@ _LOG_LOCK = threading.Lock()
 _CONFIGURED = False
 
 
+# Para qué sirve: inicializa una sola vez el logger raíz `osint_auto` con salida a consola y archivo rotativo.
+# Cómo funciona: usa double-checked locking con `_LOG_LOCK`, configura `StreamHandler` según `OSINT_LOG_LEVEL` y `RotatingFileHandler` en `data/logs/`.
 def _configure_root_logger() -> logging.Logger:
     global _CONFIGURED
     root = logging.getLogger("osint_auto")
@@ -61,6 +63,8 @@ def _configure_root_logger() -> logging.Logger:
         return root
 
 
+# Para qué sirve: provee un logger estandarizado para cualquier módulo interno del proyecto.
+# Cómo funciona: garantiza que el root logger esté configurado y devuelve el logger hijo bajo `osint_auto.<name>`.
 def get_logger(name: str = "osint_auto") -> logging.Logger:
     """Devuelve un logger hijo bajo el namespace `osint_auto`."""
     _configure_root_logger()

@@ -14,6 +14,8 @@ _HASHTAG_RE = re.compile(r"(?<![A-Za-z0-9_])#([A-Za-z0-9_\u00C0-\u024F]{2,50})")
 _URL_RE = re.compile(r"https?://[^\s<>\"')]+", re.I)
 
 
+# Para qué sirve: devuelve la marca de tiempo actual estandarizada para sellar capturas de conectores.
+# Cómo funciona: formatea `datetime.now()` en `YYYY-MM-DD HH:MM:SS`.
 def now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -21,23 +23,33 @@ def now_iso() -> str:
 class _HtmlTextExtractor(HTMLParser):
     """Convierte HTML simple (ej. Mastodon) a texto plano preservando saltos de línea."""
 
+    # Para qué sirve: inicializa la lista acumuladora de fragmentos de texto del parser HTML.
+    # Cómo funciona: invoca `super().__init__()` y crea `self.parts = []`.
     def __init__(self):
         super().__init__()
         self.parts = []
 
+    # Para qué sirve: inserta saltos de línea al abrir etiquetas de bloque o salto HTML.
+    # Cómo funciona: agrega `\n` a `self.parts` cuando encuentra `br`, `p`, `div` o `li`.
     def handle_starttag(self, tag, attrs):
         if tag.lower() in ("br", "p", "div", "li"):
             self.parts.append("\n")
 
+    # Para qué sirve: captura cada segmento textual encontrado dentro del HTML.
+    # Cómo funciona: añade `data` tal cual a `self.parts`.
     def handle_data(self, data):
         self.parts.append(data)
 
+    # Para qué sirve: reconstruye el texto plano limpio preservando párrafos sin espacios redundantes.
+    # Cómo funciona: decodifica entidades con `html.unescape`, colapsa espacios por línea y filtra líneas vacías.
     def get_text(self) -> str:
         raw = html.unescape("".join(self.parts))
         lines = [" ".join(line.split()) for line in raw.splitlines()]
         return "\n".join(line for line in lines if line).strip()
 
 
+# Para qué sirve: convierte HTML devuelto por APIs (ej. Mastodon) en texto legible para NLP y reportes.
+# Cómo funciona: alimenta `_HtmlTextExtractor` y retorna `parser.get_text()`.
 def html_to_text(raw_html: str) -> str:
     if not raw_html:
         return ""
@@ -46,6 +58,8 @@ def html_to_text(raw_html: str) -> str:
     return parser.get_text()
 
 
+# Para qué sirve: extrae handles mencionados (`@usuario` o `u/usuario`) presentes en publicaciones o bios.
+# Cómo funciona: aplica `_MENTION_RE` y `_REDDIT_USER_RE`, limpia puntuación y deduplica en orden.
 def extract_mentions(text: str) -> list:
     """Extrae menciones `@usuario` y `u/usuario` normalizadas y sin duplicados."""
     if not text:
@@ -61,6 +75,8 @@ def extract_mentions(text: str) -> list:
     return found
 
 
+# Para qué sirve: extrae hashtags de un texto para perfilado de intereses e ideas.
+# Cómo funciona: busca patrones `_HASHTAG_RE`, pasa a minúsculas y evita duplicados.
 def extract_hashtags(text: str) -> list:
     """Extrae `#hashtags` normalizados y sin duplicados."""
     if not text:
@@ -75,6 +91,8 @@ def extract_hashtags(text: str) -> list:
     return found
 
 
+# Para qué sirve: extrae URLs públicas incrustadas en bios o posts para resolución de identidad.
+# Cómo funciona: busca `_URL_RE`, recorta signos de cierre y devuelve lista única.
 def extract_urls(text: str) -> list:
     """Extrae URLs públicas presentes en una bio o publicación sin duplicados."""
     if not text:
@@ -89,6 +107,8 @@ def extract_urls(text: str) -> list:
     return found
 
 
+# Para qué sirve: construye la ficha declarativa de capacidades y límites autorizados de una plataforma.
+# Cómo funciona: empaqueta `auth_mode`, banderas `supports_*` y texto `limitations` en un dict estándar.
 def build_capabilities(
     platform_id: str,
     name: str,
@@ -114,6 +134,8 @@ def build_capabilities(
     }
 
 
+# Para qué sirve: crea la estructura normalizada vacía (`ConnectorBundle`) que todo conector/importador debe retornar.
+# Cómo funciona: inicializa listas de perfil, posts, comentarios, media, reacciones, interacciones, interactuantes y avisos.
 def empty_bundle(platform: str, handle: str, access_method: str = "public_api") -> dict:
     """Estructura normalizada devuelta por cualquier conector o importador."""
     return {
@@ -133,6 +155,8 @@ def empty_bundle(platform: str, handle: str, access_method: str = "public_api") 
     }
 
 
+# Para qué sirve: añade o actualiza un tercero interactuante dentro de `bundle["interactants"]` sin duplicarlo.
+# Cómo funciona: normaliza handle/display_name, actualiza `last_seen`/URL si ya existe o inserta registro nuevo.
 def add_interactant(
     interactants: list,
     platform: str,
@@ -168,6 +192,8 @@ def add_interactant(
     })
 
 
+# Para qué sirve: registra una arista dirigida `(origen -> destino)` en el bundle para alimentar el grafo SNA.
+# Cómo funciona: normaliza ambos handles, descarta vacíos o auto-bucles (`src == tgt`) y guarda tipo y peso.
 def add_interaction(
     interactions: list,
     source_handle: str,

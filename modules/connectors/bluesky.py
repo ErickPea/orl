@@ -17,6 +17,8 @@ from modules.connectors.common import (
 BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc"
 
 
+# Para qué sirve: normaliza un handle o URL de Bluesky al formato `usuario.bsky.social` (o DID).
+# Cómo funciona: recorta `bsky.app/profile/` si es URL y añade `.bsky.social` si no tiene punto ni `did:`.
 def _normalize_handle(handle: str) -> str:
     h = (handle or "").strip().lstrip("@").lower()
     if h.startswith("https://bsky.app/profile/"):
@@ -26,6 +28,8 @@ def _normalize_handle(handle: str) -> str:
     return h
 
 
+# Para qué sirve: convierte un URI interno ATProto (`at://...`) en enlace web navegable de Bluesky.
+# Cómo funciona: toma el último segmento (`rkey`) del URI y forma `https://bsky.app/profile/{handle}/post/{rkey}`.
 def _at_uri_to_web_url(handle: str, uri: str) -> str:
     # at://did:plc:.../app.bsky.feed.post/<rkey>
     rkey = (uri or "").rstrip("/").split("/")[-1]
@@ -34,6 +38,8 @@ def _at_uri_to_web_url(handle: str, uri: str) -> str:
     return ""
 
 
+# Para qué sirve: extrae perfil público, posts, imágenes con alt-text, hilos de respuestas y likes en Bluesky.
+# Cómo funciona: consulta `app.bsky.actor.getProfile`, `getAuthorFeed`, `getPostThread` y `getLikes` en el API público XRPC.
 def fetch_bluesky(
     handle: str,
     limit: int = 25,

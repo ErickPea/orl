@@ -23,12 +23,16 @@ _MAX_IN_MEMORY_JOBS = 100
 _EPHEMERAL_API_TOKEN = secrets.token_urlsafe(32)
 
 
+# Para qué sirve: Obtiene el token de sesión activo usado para autenticar llamadas a la API local.
+# Cómo funciona: Prioriza la variable de entorno `OSINT_API_TOKEN` o devuelve `_EPHEMERAL_API_TOKEN` generado al arrancar.
 def get_active_api_token() -> str:
     """Devuelve `OSINT_API_TOKEN` del entorno si está configurado o el token efímero de sesión."""
     env_tok = os.environ.get("OSINT_API_TOKEN", "").strip()
     return env_tok or _EPHEMERAL_API_TOKEN
 
 
+# Para qué sirve: Limita el tamaño en memoria del diccionario `_JOBS` eliminando jobs finalizados antiguos.
+# Cómo funciona: Ordena por fecha los jobs que no están `running` y hace `pop` del excedente respecto a `_MAX_IN_MEMORY_JOBS`.
 def _prune_finished_jobs_locked() -> None:
     """Mantiene acotado `_JOBS` en RAM eliminando los trabajos finalizados más antiguos."""
     if len(_JOBS) <= _MAX_IN_MEMORY_JOBS:
@@ -44,10 +48,14 @@ def _prune_finished_jobs_locked() -> None:
         _JOBS.pop(jid, None)
 
 
+# Para qué sirve: Devuelve la fecha y hora local actual formateada para timestamps de jobs.
+# Cómo funciona: Llama a `datetime.now().strftime("%Y-%m-%d %H:%M:%S")`.
 def _now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Para qué sirve: Normaliza un `case_id` opcional y valida su existencia en la base de datos.
+# Cómo funciona: Limpia espacios y consulta `storage.case_exists`, lanzando `HTTPException(404)` si no existe.
 def _validate_case_id(case_id: Optional[str]) -> Optional[str]:
     cid = (case_id or "").strip() or None
     if cid and not storage.case_exists(cid):
@@ -55,6 +63,8 @@ def _validate_case_id(case_id: Optional[str]) -> Optional[str]:
     return cid
 
 
+# Para qué sirve: Crea y registra un nuevo job asíncrono en estado `running` en RAM y SQLite.
+# Cómo funciona: Genera un UUID corto, almacena la estructura inicial en `_JOBS` bajo `_JOBS_LOCK` y llama a `storage.save_job`.
 def _create_job(kind: str, target: str, case_id: Optional[str] = None) -> dict:
     """Registra un nuevo job en estado `running` en memoria y en SQLite."""
     job_id = uuid.uuid4().hex[:12]
@@ -84,6 +94,8 @@ def _create_job(kind: str, target: str, case_id: Optional[str] = None) -> dict:
     return job
 
 
+# Para qué sirve: Actualiza estado, progreso, logs y resultado de un job, ingiriéndolo al caso al terminar.
+# Cómo funciona: Muta `_JOBS` bajo `_JOBS_LOCK`; si finalizó en `done`, ejecuta `ingest_job_result_to_case` y persiste en SQLite.
 def _update_job(job_id: str, step: str = None, progress: int = None, log: str = None, **fields):
     """Actualiza el progreso, paso actual y logs de un job de forma thread-safe."""
     snapshot = None
@@ -146,6 +158,8 @@ def _update_job(job_id: str, step: str = None, progress: int = None, log: str = 
             _prune_finished_jobs_locked()
 
 
+# Para qué sirve: Enumera los archivos exportados en un directorio de salida para enlazarlos desde la API.
+# Cómo funciona: Recorre el primer nivel de `out_dir` ordenado por nombre y construye nombre, tamaño y URL `/api/reports/...`.
 def _list_folder_files(out_dir: Path) -> list:
     """Devuelve lista de archivos generados en una carpeta de salida (solo nivel principal)."""
     if not out_dir or not out_dir.exists():
@@ -161,8 +175,12 @@ def _list_folder_files(out_dir: Path) -> list:
     return archivos
 
 
+# Para qué sirve: Lanza una función trabajadora en segundo plano protegiendo el job frente a excepciones.
+# Cómo funciona: Define `_runner` con `try/except` que marca el job en `error` si falla y lo arranca en un `threading.Thread` demonio.
 def _run_in_background(job_id: str, worker):
     """Ejecuta `worker(job_id)` en un hilo demonio y captura cualquier error en el job."""
+    # Para qué sirve: Envuelve la ejecución del worker para capturar fallos no controlados y actualizar el estado del job.
+    # Cómo funciona: Invoca `worker(job_id)` y ante excepción registra la traza y actualiza el job a `status="error"`.
     def _runner():
         try:
             worker(job_id)
@@ -182,6 +200,8 @@ def _run_in_background(job_id: str, worker):
     t.start()
 
 
+# Para qué sirve: Exige confirmación explícita de uso legítimo y fuentes públicas antes de ejecutar búsquedas.
+# Cómo funciona: Lanza `HTTPException(400)` cuando `confirm` es falso.
 def _require_legitimate(confirm: bool):
     """Valida que el usuario confirmó el uso legítimo antes de lanzar una consulta OSINT."""
     if not confirm:

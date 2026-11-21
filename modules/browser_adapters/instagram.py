@@ -12,6 +12,8 @@ from modules.browser_adapters.selectors import get_platform_selectors
 from modules.connectors.common import extract_urls
 
 
+# Para qué sirve: normaliza una URL o handle de Instagram limpiando query params y extrayendo el username.
+# Cómo funciona: recorta `?`/`#`, extrae el segmento raíz tras `instagram.com/` y construye `https://www.instagram.com/{uname}/`.
 def _normalize_ig_url(target: str) -> tuple:
     raw = (target or "").strip().split("?", 1)[0].split("#", 1)[0]
     if raw.startswith(("http://", "https://")):
@@ -23,8 +25,11 @@ def _normalize_ig_url(target: str) -> tuple:
 
 
 class InstagramBrowserAdapter(BaseBrowserAdapter):
+    """Adaptador DOM/ARIA supervisado para perfiles, grid de publicaciones y comentarios en Instagram Web."""
     platform = "instagram"
 
+    # Para qué sirve: recolecta perfil, grid de posts, captions, imágenes y comentarios visibles en Instagram Web.
+    # Cómo funciona: recorre el grid hasta `max_posts`, abre cada `/p/` o `/reel/` (soporta `resume_after_url`) y aplica fallbacks declarativos.
     def run(
         self,
         page,

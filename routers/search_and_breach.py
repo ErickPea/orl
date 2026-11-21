@@ -216,6 +216,7 @@ def api_status():
 
 @router.post("/api/search/username")
 def api_search_username(req: UsernameRequest):
+    """Lanza un job asíncrono de búsqueda de username con Maigret + Sherlock."""
     _require_legitimate(req.confirm_legitimate)
     case_id = _validate_case_id(req.case_id)
     username = req.username.strip()
@@ -424,6 +425,7 @@ def api_search_name(req: NameLocationRequest):
 
 @router.post("/api/search/email")
 def api_search_email(req: EmailRequest):
+    """Lanza un job de análisis de correo (MX, Gravatar, Holehe y brechas) en modo lookup/osint/generate."""
     _require_legitimate(req.confirm_legitimate)
     case_id = _validate_case_id(req.case_id)
     target = req.target.strip()
@@ -540,6 +542,7 @@ def api_search_email(req: EmailRequest):
 
 @router.post("/api/search/phone")
 def api_search_phone(req: PhoneRequest):
+    """Lanza un job de análisis técnico de teléfono (`phonenumbers` + Ignorant)."""
     _require_legitimate(req.confirm_legitimate)
     case_id = _validate_case_id(req.case_id)
     phone = req.phone.strip()
@@ -607,6 +610,7 @@ def api_search_phone(req: PhoneRequest):
 
 @router.post("/api/search/full")
 def api_search_full(req: FullRequest):
+    """Orquesta el pipeline completo de 5 pasos (username, correos, Blackbird, teléfono y brechas)."""
     _require_legitimate(req.confirm_legitimate)
     case_id = _validate_case_id(req.case_id)
     username = req.username.strip()
@@ -723,6 +727,7 @@ def api_search_full(req: FullRequest):
 
 @router.post("/api/breach/email")
 def api_breach_email(req: BreachEmailRequest):
+    """Lanza consulta defensiva de brechas públicas (XposedOrNot + HIBP) para un correo."""
     _require_legitimate(req.confirm_legitimate)
     case_id = _validate_case_id(req.case_id)
     email = req.email.strip()
@@ -943,6 +948,7 @@ def api_jobs():
 
 @router.get("/api/jobs/{job_id}")
 def api_job_detail(job_id: str):
+    """Devuelve estado, progreso, logs y resultado estructurado de un job en RAM o SQLite."""
     with _JOBS_LOCK:
         job = _JOBS.get(job_id)
         if job:

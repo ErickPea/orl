@@ -41,6 +41,8 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 _LINEA_HOLEHE = re.compile(r"^\[([+\-x])\]\s+([\w.-]+\.[a-z]{2,})(?:\s+(.*))?$", re.I)
 
 
+# Para qué sirve: descarta correos con errores de escritura o dominios sin servidor de correo antes de consultar APIs.
+# Cómo funciona: valida formato con regex RFC y consulta registros DNS MX por prioridad (con fallback a registro A).
 def validate_email_domain(email: str) -> dict:
     """
     Valida la sintaxis del correo y consulta los registros DNS MX del dominio
@@ -94,6 +96,8 @@ def validate_email_domain(email: str) -> dict:
     return res
 
 
+# Para qué sirve: enriquece el correo buscando un perfil público de Gravatar (nombre, alias, ubicación y cuentas).
+# Cómo funciona: calcula el hash MD5 del correo en minúsculas y consulta `gravatar.com/{md5}.json` capturando errores sin cortar el flujo.
 def lookup_gravatar(email: str, timeout: int = 8) -> dict:
     """
     Consulta el perfil público de Gravatar usando el hash MD5 del correo en minúsculas.
@@ -142,6 +146,8 @@ def lookup_gravatar(email: str, timeout: int = 8) -> dict:
     return res
 
 
+# Para qué sirve: genera correos candidatos a partir de un username para probarlos con Holehe.
+# Cómo funciona: limpia caracteres no válidos y combina `PROVIDERS` x `PATTERNS` quitando repetidos con `dict.fromkeys`.
 def generate_emails(username: str) -> list:
     """Recibe un username y devuelve la lista de correos candidatos sin repetidos."""
     u = re.sub(r"[^a-zA-Z0-9._-]", "", username.lower())
@@ -151,6 +157,8 @@ def generate_emails(username: str) -> list:
     return list(dict.fromkeys(candidatos))  # dict conserva el orden y quita duplicados
 
 
+# Para qué sirve: interpreta la salida de consola de Holehe sin mezclar cuentas inexistentes con bloqueos por rate-limit.
+# Cómo funciona: aplica `_LINEA_HOLEHE` por línea clasificando `[+]` (registrado + pista), `[-]` (no usado) y `[x]` (limitado).
 def parse_holehe_output(text: str) -> dict:
     """
     Parsea la salida de Holehe separando:
@@ -186,6 +194,8 @@ def parse_holehe_output(text: str) -> dict:
     }
 
 
+# Para qué sirve: verifica en qué servicios web está registrado un correo usando la herramienta Holehe.
+# Cómo funciona: ejecuta `holehe <email> --no-color` (sin `--only-used` para ver `[x]`), guarda el log y parsea stdout.
 def run_holehe(email: str, out_dir: Path) -> dict:
     """
     Corre Holehe sobre un correo SIN `--only-used` para poder detectar también
@@ -212,6 +222,8 @@ def run_holehe(email: str, out_dir: Path) -> dict:
     }
 
 
+# Para qué sirve: busca cuentas de correo activas derivadas de un username hasta un límite dado.
+# Cómo funciona: toma los primeros `limit` candidatos de `generate_emails`, ejecuta `run_holehe` y retorna solo los positivos.
 def run_email_search(username: str, out_dir: Path, limit: int = 12) -> dict:
     """Verifica con Holehe los primeros `limit` candidatos; devuelve {email: [servicios]} solo de los registrados."""
     if not utils.tool_available("holehe"):
@@ -231,6 +243,8 @@ def run_email_search(username: str, out_dir: Path, limit: int = 12) -> dict:
     return encontrados
 
 
+# Para qué sirve: ejecuta la investigación directa de un correo electrónico ya conocido.
+# Cómo funciona: encadena validación DNS/MX (`validate_email_domain`), perfil público (`lookup_gravatar`) y registro en servicios (`run_holehe`).
 def run_email_lookup(email: str, out_dir: Path) -> dict:
     """
     Investiga directamente un correo YA CONOCIDO:
@@ -278,6 +292,8 @@ def run_email_lookup(email: str, out_dir: Path) -> dict:
     return r
 
 
+# Para qué sirve: amplía la búsqueda de un correo hacia posibles perfiles sociales asociados al mismo alias.
+# Cómo funciona: corre `run_email_lookup`, deriva usernames del prefijo del correo y Gravatar (`3..30` chars) y los pasa por Maigret/Sherlock + consolidación.
 def run_email_osint(email: str, out_dir: Path) -> dict:
     """
     Pipeline ampliado para un correo conocido:

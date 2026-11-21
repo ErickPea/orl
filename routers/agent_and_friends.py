@@ -277,6 +277,7 @@ def api_agent_clean_cache(req: BrowserCacheCleanRequest = BrowserCacheCleanReque
 
 @router.post("/api/cases/{case_id}/agent/start")
 def api_agent_start(case_id: str, req: BrowserAgentStartRequest):
+    """Inicia una investigación supervisada en Playwright para una URL/cuenta autorizada."""
     _require_legitimate(req.confirm_legitimate)
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
@@ -296,6 +297,7 @@ def api_agent_start(case_id: str, req: BrowserAgentStartRequest):
 
 @router.get("/api/cases/{case_id}/agent/runs")
 def api_agent_case_runs(case_id: str):
+    """Lista las ejecuciones del agente de navegación registradas en `case_id`."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     return {"runs": storage.list_browser_agent_runs(case_id)}
@@ -303,6 +305,7 @@ def api_agent_case_runs(case_id: str):
 
 @router.get("/api/agent/runs/{run_id}")
 def api_agent_run_detail(run_id: str):
+    """Devuelve estado en vivo, logs e ítems en staging de una corrida del agente."""
     run = storage.get_browser_agent_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Ejecución de agente no encontrada.")
@@ -311,6 +314,7 @@ def api_agent_run_detail(run_id: str):
 
 @router.post("/api/agent/runs/{run_id}/pause")
 def api_agent_run_pause(run_id: str):
+    """Pausa una corrida activa del agente de navegador."""
     ctrl = get_run_control(run_id)
     if not ctrl:
         raise HTTPException(status_code=400, detail="La ejecución no está activa.")
@@ -320,6 +324,7 @@ def api_agent_run_pause(run_id: str):
 
 @router.post("/api/agent/runs/{run_id}/resume")
 def api_agent_run_resume(run_id: str):
+    """Reanuda una corrida pausada o en checkpoint del agente."""
     ctrl = get_run_control(run_id)
     if not ctrl:
         raise HTTPException(status_code=400, detail="La ejecución no está activa.")
@@ -329,6 +334,7 @@ def api_agent_run_resume(run_id: str):
 
 @router.post("/api/agent/runs/{run_id}/cancel")
 def api_agent_run_cancel(run_id: str):
+    """Cancela una corrida activa del agente de navegador."""
     ctrl = get_run_control(run_id)
     if not ctrl:
         raise HTTPException(status_code=400, detail="La ejecución no está activa.")
@@ -338,6 +344,7 @@ def api_agent_run_cancel(run_id: str):
 
 @router.patch("/api/agent/runs/{run_id}/items/{item_id}")
 def api_agent_patch_item(run_id: str, item_id: int, req: StagedItemPatchRequest):
+    """Selecciona o desmarca un hallazgo de staging previo al commit."""
     ok = storage.update_staged_item_selection(run_id, item_id, req.selected)
     if not ok:
         raise HTTPException(status_code=404, detail="Elemento no encontrado en staging.")
@@ -346,6 +353,7 @@ def api_agent_patch_item(run_id: str, item_id: int, req: StagedItemPatchRequest)
 
 @router.delete("/api/agent/runs/{run_id}/items/{item_id}")
 def api_agent_delete_item(run_id: str, item_id: int):
+    """Descarta definitivamente un ítem de la bandeja de staging."""
     ok = storage.delete_staged_item(run_id, item_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Elemento no encontrado en staging.")
@@ -354,6 +362,7 @@ def api_agent_delete_item(run_id: str, item_id: int):
 
 @router.post("/api/agent/runs/{run_id}/commit")
 def api_agent_commit_run(run_id: str, req: AgentCommitRequest):
+    """Consolida los ítems seleccionados de staging al caso y dispara Relacional/NLP/SNA."""
     res = commit_staged_run_to_case(
         run_id=run_id,
         run_relational=req.run_relational,
@@ -449,6 +458,7 @@ def api_case_add_friend(case_id: str, req: FriendAddRequest):
 
 @router.get("/api/cases/{case_id}/friends")
 def api_case_list_friends(case_id: str):
+    """Lista las cuentas amigas añadidas manualmente junto con sus contadores aislados."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     friends = storage.list_case_friends(case_id)
@@ -457,6 +467,7 @@ def api_case_list_friends(case_id: str):
 
 @router.get("/api/cases/{case_id}/friends/{friend_id}")
 def api_case_friend_detail(case_id: str, friend_id: int):
+    """Devuelve el panel independiente y contenido aislado perteneciente a `friend_id`."""
     detail = storage.get_friend_isolated_detail(case_id, friend_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Amigo no encontrado en este caso.")
@@ -569,6 +580,7 @@ def api_case_friend_link_sna(case_id: str, friend_id: int, req: FriendLinkSnaReq
 
 @router.delete("/api/cases/{case_id}/friends/{friend_id}")
 def api_case_delete_friend(case_id: str, friend_id: int):
+    """Elimina en cascada únicamente el contenido aislado de `friend_id` y sus enlaces SNA."""
     ok = storage.delete_friend_cascade(case_id, friend_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Amigo no encontrado.")

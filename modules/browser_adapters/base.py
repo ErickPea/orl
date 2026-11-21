@@ -43,6 +43,8 @@ class BaseBrowserAdapter:
         "código de confirmación",
     )
 
+    # Para qué sirve: detecta muros de inicio de sesión, 2FA, checkpoints o CAPTCHAs para pausar con seguridad.
+    # Cómo funciona: revisa la URL contra `_SECURITY_URL_MARKERS`, busca iframes CAPTCHA y escanea `_SECURITY_TEXT_MARKERS` en el `body`.
     def detect_security_or_login_gate(self, page) -> str:
         """
         Inspecciona URL y texto visible en busca de login-wall, 2FA, checkpoint o CAPTCHA.
@@ -66,6 +68,8 @@ class BaseBrowserAdapter:
             pass
         return ""
 
+    # Para qué sirve: unifica comentarios y respuestas extraídos del DOM bajo un mismo diccionario nominal.
+    # Cómo funciona: normaliza el handle, rellena `author_display_name` y conserva URL y flags `is_reply`/`parent_comment_id`.
     @staticmethod
     def normalize_comment_record(
         author_handle: str,
@@ -88,6 +92,8 @@ class BaseBrowserAdapter:
             "parent_comment_id": str(parent_comment_id or ""),
         }
 
+    # Para qué sirve: deja evidencia diagnóstica cuando un selector DOM falla o cae a un selector fallback.
+    # Cómo funciona: toma un screenshot en `data/browser_diagnostics/<plat>`, registra advertencia en log y llama a `update_status`.
     def record_selector_telemetry(
         self,
         page,
@@ -128,6 +134,8 @@ class BaseBrowserAdapter:
                 _LOGGER.warning("No se pudo escribir telemetría en el log del run: %s", exc)
         return shot_path_str
 
+    # Para qué sirve: define la firma obligatoria que todo adaptador de plataforma debe implementar.
+    # Cómo funciona: método abstracto que lanza `NotImplementedError` si la subclase no lo sobrescribe.
     def run(
         self,
         page,

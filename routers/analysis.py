@@ -639,6 +639,7 @@ def api_case_location_history(
 
 @router.get("/api/cases/{case_id}/subject-profile")
 def api_case_subject_profile(case_id: str):
+    """Devuelve las entradas del perfil enriquecido del sujeto agrupadas por categoría."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     entries = storage.list_subject_profile(case_id)
@@ -650,6 +651,7 @@ def api_case_subject_profile(case_id: str):
 
 @router.post("/api/cases/{case_id}/subject-profile/recompute")
 def api_case_subject_profile_recompute(case_id: str):
+    """Recalcula y persiste las 7 categorías del perfil del sujeto desde NLP, Visión y SNA."""
     if not storage.case_exists(case_id):
         raise HTTPException(status_code=404, detail="Caso no encontrado.")
     from modules.subject_profile import compute_subject_profile
@@ -658,6 +660,7 @@ def api_case_subject_profile_recompute(case_id: str):
 
 @router.patch("/api/cases/{case_id}/subject-profile/{entry_id}")
 def api_case_subject_profile_review(case_id: str, entry_id: int, req: SubjectProfileReviewRequest):
+    """Registra la validación o descarte humano sobre una entrada de `subject_profile`."""
     updated = storage.update_subject_profile_review(case_id, entry_id, req.human_review)
     if not updated:
         raise HTTPException(status_code=404, detail="Entrada de perfil no encontrada.")

@@ -17,6 +17,8 @@ from modules.connectors.common import (
 GITHUB_API = "https://api.github.com"
 
 
+# Para qué sirve: extrae el nombre de usuario limpio desde un handle `@usuario` o URL de GitHub.
+# Cómo funciona: remueve `@` y toma el primer segmento posterior a `github.com/` si es URL.
 def _clean_user(handle: str) -> str:
     h = (handle or "").strip().lstrip("@")
     if "github.com/" in h:
@@ -25,6 +27,8 @@ def _clean_user(handle: str) -> str:
     return h
 
 
+# Para qué sirve: obtiene perfil público, repositorios técnicos y actividad colaborativa reciente en GitHub.
+# Cómo funciona: consulta `/users/{user}`, `/repos` y `/events/public` usando `GITHUB_TOKEN` si está configurado.
 def fetch_github(handle: str, limit: int = 20, include_replies: bool = True, timeout: int = 12) -> dict:
     """Obtiene perfil público, repositorios (temas/lenguajes) y eventos públicos colaborativos."""
     user = _clean_user(handle)

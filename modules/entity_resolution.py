@@ -42,6 +42,8 @@ _COMMON_SHORT_WORDS = {
 _URL_RE = re.compile(r"https?://[^\s<>\"')]+", re.I)
 
 
+# Para qué sirve: estandariza cualquier texto eliminando tildes, mayúsculas y espacios sobrantes para comparaciones.
+# Cómo funciona: descompone en NFD con `unicodedata`, filtra marcas diacríticas (`Mn`) y colapsa espacios.
 def normalize_text(text: str) -> str:
     """Minúsculas sin tildes ni espacios repetidos."""
     if not text:
@@ -51,6 +53,8 @@ def normalize_text(text: str) -> str:
     return " ".join(sin_tildes.lower().split())
 
 
+# Para qué sirve: unifica URLs de perfiles para deduplicarlas y detectar enlaces cruzados entre plataformas.
+# Cómo funciona: antepone esquema si falta, quita `www.` del host y elimina `/` finales del path en minúsculas.
 def normalize_url(url: str) -> str:
     """Normaliza una URL para deduplicación y detección de enlaces cruzados."""
     raw = (url or "").strip()
@@ -66,18 +70,24 @@ def normalize_url(url: str) -> str:
     return f"{host}{path}"
 
 
+# Para qué sirve: extrae palabras informativas de biografías o ubicaciones descartando stopwords.
+# Cómo funciona: normaliza el texto, extrae tokens alfanuméricos de longitud >= `min_len` y filtra `_STOPWORDS`.
 def _tokenize(text: str, min_len: int = 3) -> set:
     norm = normalize_text(text)
     tokens = re.findall(r"[a-z0-9]+", norm)
     return {t for t in tokens if len(t) >= min_len and t not in _STOPWORDS}
 
 
+# Para qué sirve: obtiene tokens alfabéticos individuales de un nombre propio o `display_name`.
+# Cómo funciona: normaliza tildes/minúsculas y extrae palabras `[a-z]+` de al menos 2 caracteres.
 def _name_tokens(text: str) -> set:
     norm = normalize_text(text)
     tokens = re.findall(r"[a-z]+", norm)
     return {t for t in tokens if len(t) >= 2}
 
 
+# Para qué sirve: recolecta las URLs salientes declaradas en un perfil para buscar enlaces cruzados.
+# Cómo funciona: busca URLs HTTP(S) dentro de `website` y `bio` y las normaliza con `normalize_url`.
 def _extract_urls_from_profile(profile: dict) -> set:
     urls = set()
     for field in ("website", "bio"):
@@ -93,6 +103,8 @@ def _extract_urls_from_profile(profile: dict) -> set:
     return urls
 
 
+# Para qué sirve: pondera la singularidad de un username para penalizar coincidencias débiles por homonimia.
+# Cómo funciona: asigna de 4 a 18 puntos según longitud, separadores/dígitos y presencia en `_COMMON_SHORT_WORDS`.
 def _username_specificity(username: str) -> tuple:
     """
     Evalúa qué tan distintivo es un username para reducir falsos positivos por homonimia.
@@ -114,6 +126,8 @@ def _username_specificity(username: str) -> tuple:
     return 9, f"Username de especificidad moderada ('{u}')", False
 
 
+# Para qué sirve: mide la similitud léxica entre dos conjuntos de tokens (p. ej. biografías).
+# Cómo funciona: calcula el índice de Jaccard `|A ∩ B| / |A ∪ B|`.
 def _jaccard(a: set, b: set) -> float:
     if not a or not b:
         return 0.0
@@ -122,6 +136,8 @@ def _jaccard(a: set, b: set) -> float:
     return inter / union if union else 0.0
 
 
+# Para qué sirve: calcula el puntaje explicable (0-100) y nivel de resolución de cada perfil frente a las semillas del caso.
+# Cómo funciona: compara pares de perfiles (enlaces cruzados, avatar, bio, nombre), suma evidencias contra semillas y respeta `manual_status`.
 def evaluate_case_resolution(
     profiles: list,
     identifiers: list,

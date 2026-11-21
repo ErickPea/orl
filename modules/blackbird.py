@@ -18,6 +18,8 @@ _SITE_BRACKET_RE = re.compile(r"\[\+\]\s*\[([^\]]+)\]")
 _IGNORAR_DOMINIOS = {"github.com/p1ngul1n0/blackbird"}
 
 
+# Para qué sirve: extrae perfiles encontrados desde la salida de texto de Blackbird sin falsos positivos de banner.
+# Cómo funciona: limpia códigos ANSI, filtra líneas positivas (`[+]`, `FOUND`, `✔`), extrae URLs y omite dominios propios del proyecto.
 def parse_blackbird_output(text: str) -> list:
     """
     Parsea la salida de texto de Blackbird y devuelve una lista de dicts:
@@ -54,6 +56,8 @@ def parse_blackbird_output(text: str) -> list:
     return encontrados
 
 
+# Para qué sirve: ejecuta Blackbird por username/correo y guarda el log crudo en `out_dir`.
+# Cómo funciona: verifica el comando, corre el subproceso con timeout de 600 s y parsea los hallazgos.
 def run_blackbird(username: str, out_dir: Path, email: str = None) -> dict:
     """Corre Blackbird por username (y correo si se da); guarda el log en out_dir y devuelve hallazgos."""
     base = utils.tool_command("blackbird")

@@ -48,12 +48,16 @@ _LOGIN_PATH_MARKERS = ("/login", "/accounts/login", "/authwall", "/checkpoint", 
 class _MetaParser(HTMLParser):
     """Extractor ligero de <title> y etiquetas <meta> (Open Graph / description) sin dependencias extra."""
 
+    # Para qué sirve: inicializa los acumuladores del parser HTML para título y etiquetas meta.
+    # Cómo funciona: prepara `self.meta`, `self.in_title` y `self.title_parts` llamando a `super().__init__()`.
     def __init__(self):
         super().__init__()
         self.meta = {}
         self.in_title = False
         self.title_parts = []
 
+    # Para qué sirve: captura etiquetas `<title>` y `<meta>` relevantes durante el parseo de HTML público.
+    # Cómo funciona: activa `in_title` al abrir `<title>` y guarda claves Open Graph / Twitter / `description` en `self.meta`.
     def handle_starttag(self, tag, attrs):
         tag_l = tag.lower()
         if tag_l == "title":
@@ -69,30 +73,42 @@ class _MetaParser(HTMLParser):
         if key in ("og:title", "og:description", "og:image", "og:site_name", "description", "twitter:title", "twitter:description"):
             self.meta.setdefault(key, content[:280])
 
+    # Para qué sirve: cierra la captura de texto del título al encontrar `</title>`.
+    # Cómo funciona: desactiva `self.in_title`.
     def handle_endtag(self, tag):
         if tag.lower() == "title":
             self.in_title = False
 
+    # Para qué sirve: acumula los fragmentos de texto dentro de `<title>...</title>`.
+    # Cómo funciona: agrega `data` a `self.title_parts` mientras `self.in_title` sea verdadero.
     def handle_data(self, data):
         if self.in_title:
             self.title_parts.append(data)
 
+    # Para qué sirve: devuelve el título de la página limpio y acotado a 180 caracteres.
+    # Cómo funciona: une `title_parts`, colapsa espacios y recorta la cadena.
     @property
     def title(self) -> str:
         return " ".join("".join(self.title_parts).split())[:180]
 
 
+# Para qué sirve: extrae el dominio normalizado sin prefijo `www.` desde una URL.
+# Cómo funciona: parsea `netloc` en minúsculas con `urlparse` y remueve `"www."`.
 def _clean_host(url: str) -> str:
     host = urlparse(url or "").netloc.lower()
     return host[4:] if host.startswith("www.") else host
 
 
+# Para qué sirve: determina si un hallazgo corresponde a una red social o comunidad pública.
+# Cómo funciona: busca alguna palabra clave de `SOCIAL_KEYWORDS` dentro de `sitio` y `url`.
 def is_social_profile(sitio: str, url: str) -> bool:
     """Indica si el perfil corresponde a una red social o comunidad pública."""
     texto = f"{sitio} {url}".lower()
     return any(k in texto for k in SOCIAL_KEYWORDS)
 
 
+# Para qué sirve: obtiene el username limpio desde la ruta de una URL de perfil social.
+# Cómo funciona: toma el último segmento no vacío (o el posterior a `/u/` o `/user/` en Reddit) y sanea caracteres.
 def _extract_username_from_url(url: str) -> str:
     """Extrae el último segmento útil del path de una URL de perfil (ej. github.com/user -> user)."""
     partes = [p for p in urlparse(url or "").path.split("/") if p]
@@ -105,6 +121,8 @@ def _extract_username_from_url(url: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._\-]", "", ultimo)
 
 
+# Para qué sirve: consulta metadatos públicos oficiales de un usuario en GitHub sin autenticación.
+# Cómo funciona: llama a `api.github.com/users/{username}`, controla 404/403 y extrae bio, ubicación, org y contadores.
 def fetch_github_public(username: str, timeout: int = 8) -> dict:
     """Consulta la API pública oficial de GitHub (sin autenticación) para un usuario."""
     if not REQUESTS_OK or not username:
@@ -148,6 +166,8 @@ def fetch_github_public(username: str, timeout: int = 8) -> dict:
         return {"status": "unavailable", "note": f"Error de red: {exc.__class__.__name__}"}
 
 
+# Para qué sirve: obtiene información pública básica de un usuario de Reddit sin OAuth2.
+# Cómo funciona: consulta `/user/{username}/about.json`, maneja 404/403/429 y extrae título, descripción y karma.
 def fetch_reddit_public(username: str, timeout: int = 8) -> dict:
     """Consulta el endpoint JSON público oficial de Reddit para metadatos básicos del perfil."""
     if not REQUESTS_OK or not username:
@@ -185,6 +205,8 @@ def fetch_reddit_public(username: str, timeout: int = 8) -> dict:
         return {"status": "unavailable", "note": f"Error de red: {exc.__class__.__name__}"}
 
 
+# Para qué sirve: inspecciona metadatos públicos de una URL social respetando muros de login sin intentar evadirlos.
+# Cómo funciona: marca `login_wall` para dominios cerrados, usa APIs públicas en GitHub/Reddit o parsea `<meta og:*>`/`<title>` en otros sitios.
 def fetch_public_metadata(url: str, timeout: int = 8) -> dict:
     """
     Obtiene únicamente metadatos públicos abiertos de una URL de red social:
@@ -272,6 +294,8 @@ def fetch_public_metadata(url: str, timeout: int = 8) -> dict:
     }
 
 
+# Para qué sirve: enriquece perfiles sociales detectados con metadatos abiertos hasta un máximo configurable.
+# Cómo funciona: filtra con `is_social_profile`, consulta `fetch_public_metadata` para los primeros `max_checks` y marca el resto `skipped`.
 def enrich_social_profiles(profiles: list, max_checks: int = 12, fetch_online: bool = True) -> list:
     """
     Filtra los perfiles correspondientes a redes sociales y enriquece hasta `max_checks`
@@ -302,6 +326,8 @@ def enrich_social_profiles(profiles: list, max_checks: int = 12, fetch_online: b
 # ---------------------------------------------------------------------------
 # Evaluación defensiva de exposición y privacidad
 # ---------------------------------------------------------------------------
+# Para qué sirve: cuantifica la exposición pública del objetivo y sugiere acciones defensivas concretas.
+# Cómo funciona: calcula un puntaje `0..100` ponderando perfiles `ALTA`, redes sociales, señales y brechas, y clasifica en `ALTO`/`MODERADO`/`BAJO`.
 def build_privacy_assessment(profiles: list = None, emails: dict = None,
                              breaches: dict = None, signals: dict = None) -> dict:
     """
@@ -374,6 +400,8 @@ def build_privacy_assessment(profiles: list = None, emails: dict = None,
 # ---------------------------------------------------------------------------
 # Grafo de huella digital (nodos y aristas para visualización SVG en la Web UI)
 # ---------------------------------------------------------------------------
+# Para qué sirve: genera el grafo `{nodes, edges}` de huella digital para visualizar conexiones en la interfaz web.
+# Cómo funciona: crea nodo central `root` y enlaza hasta `max_profiles` perfiles, correos, teléfono, brechas y señales.
 def build_footprint_graph(target: str, profiles: list = None, emails: dict = None,
                           phone: dict = None, breaches: dict = None, signals: dict = None,
                           max_profiles: int = 24) -> dict:

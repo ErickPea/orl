@@ -18,6 +18,8 @@ from modules.connectors.common import (
 )
 
 
+# Para qué sirve: convierte timestamps UNIX de Reddit a fecha ISO UTC legible.
+# Cómo funciona: transforma el epoch a `datetime(..., tz=timezone.utc)` con formato `YYYY-MM-DD HH:MM:SS`.
 def _ts_to_iso(ts) -> str:
     if not ts:
         return ""
@@ -27,6 +29,8 @@ def _ts_to_iso(ts) -> str:
         return ""
 
 
+# Para qué sirve: extrae el username limpio desde `u/usuario`, `@usuario` o URL completa de Reddit.
+# Cómo funciona: detecta segmentos `/u/` o `/user/` en URLs y remueve prefijos/espacios.
 def _clean_username(handle: str) -> str:
     h = (handle or "").strip()
     if "reddit.com/" in h:
@@ -37,6 +41,8 @@ def _clean_username(handle: str) -> str:
     return h.removeprefix("u/").removeprefix("/u/").lstrip("@").strip()
 
 
+# Para qué sirve: recopila perfil, envíos, imágenes, comentarios y respuestas de terceros en Reddit (público u OAuth2).
+# Cómo funciona: consulta `/about.json`, `/submitted.json`, `/comments.json` y opcionalmente los hilos de posts propios.
 def fetch_reddit(
     handle: str,
     limit: int = 25,

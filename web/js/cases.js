@@ -6,6 +6,7 @@ import { renderCaseSnaPreview } from "./sna.js";
 // ---------------------------------------------------------------------------
 // Fase 1 :: Casos, Entidades y Resolución de Entidades (SQLite)
 // ---------------------------------------------------------------------------
+/** Obtiene la lista de casos desde `/api/cases` y sincroniza el selector global. */
 export async function loadCases() {
   try {
     const data = await api("/api/cases");
@@ -35,6 +36,7 @@ export async function loadCases() {
   }
 }
 
+/** Sincroniza el selector superior del caso activo y los selectores secundarios SNA/Agente. */
 export function syncActiveCaseSelect() {
   const sel = document.getElementById("activeCaseSelect");
   if (!sel) return;
@@ -71,6 +73,7 @@ export function syncActiveCaseSelect() {
   }
 }
 
+/** Renderiza el listado lateral de casos con acciones de selección, activación y borrado. */
 export function renderCasesList() {
   const listEl = document.getElementById("casesList");
   if (!listEl) return;
@@ -110,6 +113,7 @@ export function renderCasesList() {
   });
 }
 
+/** Carga el catálogo de conectores oficiales disponibles desde `/api/connectors`. */
 export async function loadConnectors() {
   try {
     const data = await api("/api/connectors");
@@ -119,6 +123,7 @@ export async function loadConnectors() {
   }
 }
 
+/** Carga la matriz de capacidades por plataforma y conexiones OAuth2 activas. */
 export async function loadPlatformCapabilities() {
   try {
     const data = await api("/api/platforms/capabilities");
@@ -129,6 +134,7 @@ export async function loadPlatformCapabilities() {
   }
 }
 
+/** Consulta disponibilidad de motores de visión (Pillow/dHash, Ollama, Gemini, OpenAI, Tesseract). */
 export async function loadVisionStatus() {
   try {
     state.visionStatus = await api("/api/vision/status");
@@ -137,6 +143,7 @@ export async function loadVisionStatus() {
   }
 }
 
+/** Consulta disponibilidad de motores NLP locales y LLM opcionales. */
 export async function loadNlpStatus() {
   try {
     state.nlpStatus = await api("/api/nlp/status");
@@ -145,6 +152,7 @@ export async function loadNlpStatus() {
   }
 }
 
+/** Selecciona un caso y carga en paralelo detalle, contenido, visión, NLP, relacional y evidencias. */
 export async function selectCase(caseId) {
   if (!caseId) return;
   state.selectedCaseId = caseId;
@@ -183,6 +191,7 @@ export function _scoreColor(score, level) {
   return "var(--amber)";
 }
 
+/** Renderiza pestañas de contenido ingerido (posts, comentarios, perfil enriquecido, historial de ubicaciones). */
 export function renderCaseContentViewer(containerEl, content, evidences = null) {
   if (!containerEl) return;
   const counts = (content && content.counts) || { posts: 0, comments: 0, media: 0, interactions: 0 };
@@ -498,6 +507,7 @@ export function renderCaseContentViewer(containerEl, content, evidences = null) 
   });
 }
 
+/** Renderiza galería visual del caso, duplicados dHash, investigación de foto y mapa geo-hints. */
 export function renderCaseVisionPanel(containerEl, caseId, vision) {
   if (!containerEl) return;
   const v = vision || { stats: {}, theme_summary: [], similar_pairs: [], ocr_snippets: [], media_items: [] };
@@ -913,6 +923,7 @@ export function renderCaseVisionPanel(containerEl, caseId, vision) {
   }
 }
 
+/** Dibuja en `<canvas>` el mapa proyectado con los puntos de ubicación candidatos y sus pesos. */
 export function renderGeoHintsMap(canvas, candidates, focusPoints = true) {
   if (!canvas || !candidates || !candidates.length) return;
   const dpr = window.devicePixelRatio || 1;
@@ -1063,6 +1074,7 @@ export function _renderSentimentCard(title, s) {
   `;
 }
 
+/** Renderiza análisis NLP del caso (intereses, NER, sentimiento sujeto vs. terceros y patrones horarios). */
 export function renderCaseNlpPanel(containerEl, caseId, nlp) {
   if (!containerEl) return;
   const ns = state.nlpStatus || {};
@@ -1247,6 +1259,7 @@ export function _reviewBadge(st) {
   return `<span class="badge badge-info">Pendiente</span>`;
 }
 
+/** Renderiza señales de lenguaje relacional con filtros y revisión humana (validar/ambiguo/descartar). */
 export function renderCaseRelationalPanel(containerEl, caseId, relational) {
   if (!containerEl) return;
   const data = relational || { stats: {}, signals: [] };
@@ -1396,6 +1409,7 @@ export function renderCaseRelationalPanel(containerEl, caseId, relational) {
   });
 }
 
+/** Orquesta el panel completo de detalle del caso (semillas, perfiles, ingestas, análisis y acciones). */
 export function renderCaseDetail(detail, content = null, vision = null, nlp = null, relational = null, evidences = null) {
   const pane = document.getElementById("caseDetailPane");
   if (!pane || !detail || !detail.case) return;
@@ -2078,6 +2092,7 @@ export function renderCaseDetail(detail, content = null, vision = null, nlp = nu
 // ---------------------------------------------------------------------------
 // Fase 6 :: Reporte Integral, Evaluación de Exposición y Gobernanza de Temporales
 // ---------------------------------------------------------------------------
+/** Carga el puntaje de exposición y genera el Reporte Integral del Caso (HTML/PDF/JSON). */
 export async function renderCaseReportPanel(containerEl, caseId) {
   if (!containerEl) return;
   containerEl.innerHTML = `<div class="panel-card"><div class="muted">Calculando evaluación defensiva de exposición...</div></div>`;
@@ -2189,6 +2204,7 @@ export async function renderCaseReportPanel(containerEl, caseId) {
   }
 }
 
+/** Consulta y muestra métricas de almacenamiento (`output/`, SQLite y cachés de navegador). */
 export async function loadStorageMaintenance() {
   const body = document.getElementById("storageGovernanceBody");
   if (!body) return;

@@ -119,10 +119,14 @@ _MENTION_RE = re.compile(r"(?<![A-Za-z0-9_])@([A-Za-z0-9_.-]{2,60})")
 _WEEKDAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
 
+# Para qué sirve: obtiene la fecha y hora actual en formato ISO local legible para sellar análisis.
+# Cómo funciona: formatea `datetime.now()` como `YYYY-MM-DD HH:MM:SS`.
 def _now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Para qué sirve: normaliza textos sin tildes ni mayúsculas para comparar contra léxicos y categorías.
+# Cómo funciona: descompone en NFD con `unicodedata`, filtra marcas diacríticas (`Mn`) y colapsa espacios.
 def _norm(text: str) -> str:
     if not text:
         return ""
@@ -131,6 +135,8 @@ def _norm(text: str) -> str:
     return " ".join(clean.lower().split())
 
 
+# Para qué sirve: extrae los tokens alfanuméricos normalizados de un texto para sentimiento y palabras clave.
+# Cómo funciona: aplica `_norm` y busca palabras `[a-z0-9]+` mediante regex.
 def _tokens(text: str) -> list:
     return re.findall(r"[a-z0-9]+", _norm(text))
 
@@ -138,6 +144,8 @@ def _tokens(text: str) -> list:
 # ---------------------------------------------------------------------------
 # Estado de motores NLP
 # ---------------------------------------------------------------------------
+# Para qué sirve: comprueba si existe un servidor Ollama activo y qué modelo de texto usar.
+# Cómo funciona: consulta `/api/tags` en `OLLAMA_URL` (timeout 1.5 s) y prioriza `OLLAMA_TEXT_MODEL` o el primero listado.
 def _check_ollama_text(timeout: float = 1.5) -> dict:
     base_url = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
     preferred = os.environ.get("OLLAMA_TEXT_MODEL", "").strip()
@@ -158,6 +166,8 @@ def _check_ollama_text(timeout: float = 1.5) -> dict:
         return {"available": False, "server_up": False, "url": base_url, "models": [], "selected_model": preferred}
 
 
+# Para qué sirve: reporta qué motores de análisis textual/LLM están disponibles en el entorno actual.
+# Cómo funciona: verifica Ollama (si `probe_ollama=True`), `GEMINI_API_KEY` y `OPENAI_API_KEY` eligiendo `default_engine`.
 def nlp_capabilities(probe_ollama: bool = True) -> dict:
     """Informa qué motores NLP/LLM están disponibles."""
     oll = _check_ollama_text() if probe_ollama else {"available": False, "models": [], "selected_model": ""}
@@ -183,6 +193,8 @@ def nlp_capabilities(probe_ollama: bool = True) -> dict:
 # ---------------------------------------------------------------------------
 # Análisis de Sentimiento con ventana de negación
 # ---------------------------------------------------------------------------
+# Para qué sirve: clasifica la polaridad (`POSITIVO`, `NEUTRO`, `CRÍTICO`) de un texto corto sin dependencias externas.
+# Cómo funciona: evalúa palabras de `_POS_WORDS`/`_NEG_WORDS` invirtiendo el signo si hay un negador en los 2 tokens previos.
 def analyze_sentiment(text: str) -> dict:
     """Evalúa polaridad (`POSITIVO`, `NEUTRO`, `CRÍTICO`) con inversión por negaciones."""
     toks = _tokens(text)
@@ -229,6 +241,8 @@ def analyze_sentiment(text: str) -> dict:
     }
 
 
+# Para qué sirve: resume porcentajes, puntaje promedio y tono dominante de un grupo de sentimientos.
+# Cómo funciona: cuenta etiquetas positivas/neutras/críticas y determina `dominant` cuando una polaridad supera a la opuesta.
 def _aggregate_sentiments(sent_list: list) -> dict:
     total = len(sent_list)
     pos = sum(1 for s in sent_list if s["label"] == "POSITIVO")
@@ -257,7 +271,10 @@ def _aggregate_sentiments(sent_list: list) -> dict:
 # ---------------------------------------------------------------------------
 # Extracción de Entidades (NER ligero) y Línea de Tiempo
 # ---------------------------------------------------------------------------
+# Para qué sirve: extrae lugares, organizaciones, dominios, hashtags, menciones y palabras clave frecuentes del corpus.
+# Cómo funciona: combina ubicaciones de perfiles, diccionario `_KNOWN_PLACES` y patrones regex con `Counter`.
 def extract_entities(texts: list, profile_locations: Optional[list] = None) -> dict:
+    """Extrae lugares, organizaciones y dominios mediante patrones NER léxicos con conteo de frecuencia."""
     places = Counter()
     orgs = Counter()
     domains = Counter()
@@ -313,6 +330,8 @@ def extract_entities(texts: list, profile_locations: Optional[list] = None) -> d
     }
 
 
+# Para qué sirve: interpreta fechas heterogéneas de publicaciones/comentarios a objetos `datetime`.
+# Cómo funciona: intenta `datetime.fromisoformat` y luego formatos comunes (`%Y-%m-%d %H:%M:%S`, `%d/%m/%Y`, etc.).
 def _parse_dt(raw: str) -> Optional[datetime]:
     s = (raw or "").strip()
     if not s:
@@ -330,6 +349,8 @@ def _parse_dt(raw: str) -> Optional[datetime]:
     return None
 
 
+# Para qué sirve: detecta hábitos temporales de publicación (meses, días de semana y franja horaria pico).
+# Cómo funciona: agrupa fechas válidas con `_parse_dt` y solo clasifica franja horaria si el texto incluye hora (`":"`).
 def build_activity_timeline(dated_items: list) -> dict:
     """Calcula distribución mensual, por día de la semana y por franja horaria."""
     by_month = Counter()
@@ -373,6 +394,8 @@ def build_activity_timeline(dated_items: list) -> dict:
 # ---------------------------------------------------------------------------
 # Síntesis opcional con LLM (Ollama / Gemini / OpenAI)
 # ---------------------------------------------------------------------------
+# Para qué sirve: extrae un diccionario JSON válido desde la respuesta textual de un LLM.
+# Cómo funciona: remueve cercas Markdown ```json y hace fallback por regex sobre `{...}`.
 def _extract_json(raw: str) -> Optional[dict]:
     if not raw:
         return None
@@ -392,6 +415,8 @@ def _extract_json(raw: str) -> Optional[dict]:
     return None
 
 
+# Para qué sirve: solicita una síntesis ejecutiva opcional en JSON a Ollama, Gemini u OpenAI.
+# Cómo funciona: enruta según `provider` (`auto`/`ollama`/`gemini`/`openai`) y cae a `(None, "local", nota)` si falla.
 def _call_llm_synthesis(prompt: str, provider: str) -> tuple:
     """Devuelve (dict_json_o_None, engine_name, note)."""
     prov = (provider or "local").strip().lower()
@@ -478,6 +503,8 @@ def _call_llm_synthesis(prompt: str, provider: str) -> tuple:
 # ---------------------------------------------------------------------------
 # Pipeline principal NLP sobre un Caso
 # ---------------------------------------------------------------------------
+# Para qué sirve: ejecuta el análisis NLP multimodal completo sobre biografías, posts, comentarios y temas visuales del caso.
+# Cómo funciona: separa sujeto vs. terceros, fusiona intereses texto+visión, extrae NER/timeline y genera resumen local o LLM.
 def analyze_case_nlp(corpus: dict, provider: str = "local") -> dict:
     """
     Analiza el corpus completo de un caso:

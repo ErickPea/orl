@@ -112,6 +112,8 @@ PLATFORM_SELECTOR_PROFILES = {
 }
 
 
+# Para qué sirve: fusiona recursivamente sobrescrituras locales de selectores sobre el perfil base.
+# Cómo funciona: clona `base` con `copy.deepcopy` y combina diccionarios anidados clave a clave.
 def _deep_merge(base: dict, override: dict) -> dict:
     out = copy.deepcopy(base)
     for k, v in (override or {}).items():
@@ -122,6 +124,8 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
+# Para qué sirve: entrega la configuración declarativa de selectores DOM/ARIA vigente para una red social.
+# Cómo funciona: carga el perfil de `PLATFORM_SELECTOR_PROFILES` y aplica `browser_selectors_override.json` si existe.
 def get_platform_selectors(platform: str, override_path: Optional[Path] = None) -> dict:
     """
     Devuelve el perfil declarativo de selectores para `platform`, fusionando

@@ -44,10 +44,14 @@ _KIND_WEIGHT = {
 }
 
 
+# Para qué sirve: estandariza un identificador de cuenta removiendo `@`, espacios y mayúsculas.
+# Cómo funciona: limpia y pasa a minúsculas la cadena recibida.
 def _clean_handle(h: str) -> str:
     return (h or "").strip().lstrip("@").lower()
 
 
+# Para qué sirve: extrae la fecha calendario (`YYYY-MM-DD`) de una marca temporal para medir días activos compartidos.
+# Cómo funciona: verifica el formato ISO inicial y devuelve los primeros 10 caracteres.
 def _extract_day(raw_date: str) -> str:
     s = (raw_date or "").strip()
     if len(s) >= 10 and s[4] == "-" and s[7] == "-":
@@ -55,6 +59,8 @@ def _extract_day(raw_date: str) -> str:
     return ""
 
 
+# Para qué sirve: identifica los temas dominantes intercambiados con un nodo a partir de sus comentarios.
+# Cómo funciona: normaliza cada texto, busca palabras clave de `FULL_THEME_TAXONOMY` y devuelve el top 4.
 def _themes_in_texts(texts: list) -> list:
     counts = Counter()
     for raw in texts or []:
@@ -67,6 +73,8 @@ def _themes_in_texts(texts: list) -> list:
     return [{"label": k, "count": v} for k, v in counts.most_common(4)]
 
 
+# Para qué sirve: calcula la centralidad de intermediación exacta de cada nodo (quién conecta grupos entre sí).
+# Cómo funciona: implementa el algoritmo de Brandes por BFS sobre grafo no dirigido y normaliza por `(n-1)*(n-2)`.
 def _brandes_betweenness(nodes: list, adj: dict) -> dict:
     """
     Algoritmo exacto de Brandes para centralidad de intermediación (grafo no dirigido)
@@ -114,6 +122,8 @@ def _brandes_betweenness(nodes: list, adj: dict) -> dict:
     return cb
 
 
+# Para qué sirve: agrupa las cuentas del entorno en comunidades evitando que el Ego central las absorba en un solo clúster.
+# Cómo funciona: suma peso de co-hilos + afinidad temática suave (+0.45) y ejecuta Label Propagation ponderado determinista.
 def _detect_communities(alters: list, peer_adj: dict, alter_themes: dict) -> dict:
     """
     Detecta comunidades entre las cuentas del entorno (excluyendo el Ego central
@@ -179,6 +189,8 @@ def _detect_communities(alters: list, peer_adj: dict, alter_themes: dict) -> dic
     return handle_to_cid
 
 
+# Para qué sirve: estima un puntaje complementario (0-100) de cercanía visual/temporal entre el sujeto y un tercero.
+# Cómo funciona: combina coincidencias `dHash` (<=55 pts), días compartidos (<=25 pts) y temas NER (<=20 pts), manteniendo el mayor con BD.
 def compute_visual_proximity_score(
     dhash_matches_count: int = 0,
     shared_active_days: int = 0,
@@ -199,6 +211,8 @@ def compute_visual_proximity_score(
     return round(max(computed, min(100.0, float(stored_visual_score or 0.0))), 1)
 
 
+# Para qué sirve: resume las señales de lenguaje relacional ligadas a un nodo SNA manteniendo cautela epistémica.
+# Cómo funciona: cuenta señales validadas/explícitas/ambiguas/inferidas, extrae categorías únicas y adjunta hasta 8 citas.
 def _summarize_relational_cues(cues: list) -> dict:
     """Resume señales de lenguaje relacional asociadas a un nodo sin afirmar relaciones definitivas."""
     if not cues:
@@ -223,6 +237,8 @@ def _summarize_relational_cues(cues: list) -> dict:
     }
 
 
+# Para qué sirve: construye el grafo SNA completo, el ranking de Círculo Cercano y sus comunidades.
+# Cómo funciona: colapsa alias del sujeto al Ego, pondera reciprocidad/frecuencia/días, calcula Brandes + comunidades y empaqueta evidencia literal.
 def build_case_sna(inputs: dict) -> dict:
     """
     Construye el análisis SNA completo a partir de:
@@ -238,6 +254,8 @@ def build_case_sna(inputs: dict) -> dict:
     ego_id = raw_handles[0] if raw_handles else (_clean_handle(subject_name) or "sujeto")
     ego_label = subject_name or (f"@{ego_id}" if ego_id else "Sujeto")
 
+    # Para qué sirve: unifica alias del sujeto al nodo `ego_id` y filtra handles inválidos/bots.
+    # Cómo funciona: limpia el handle y comprueba pertenencia en `subject_handles` o lista de descarte.
     def canonical(h: str) -> str:
         c = _clean_handle(h)
         if not c or c in ("desconocido", "[deleted]", "automoderator"):

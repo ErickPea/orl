@@ -46,6 +46,8 @@ _EXPLICIT_REL_STATUS_RE = re.compile(
 )
 
 
+# Para qué sirve: construye el perfil enriquecido del sujeto en 7 categorías a partir de todas las evidencias del caso.
+# Cómo funciona: agrega hobbies, lugares, amigos, ideas, personalidad, ocupación y pareja aplicando regla dura de citas literales y guarda en SQLite.
 def compute_subject_profile(case_id: str, persist: bool = True) -> dict:
     """Calcula (y opcionalmente persiste) las 7 categorías del perfil enriquecido del sujeto."""
     detail = storage.get_case_detail(case_id)
@@ -64,6 +66,8 @@ def compute_subject_profile(case_id: str, persist: bool = True) -> dict:
     entries = []
     seen = set()
 
+    # Para qué sirve: agrega una entrada deduplicada al perfil aplicando la regla de cautela epistemológica.
+    # Cómo funciona: degrada `explicit` a `ambiguous` en `relationship_status`/`ideas` si falta cita literal y acota `conf` a `[0, 1]`.
     def _add(cat: str, val: str, conf: float, refs: list, epistemic: str):
         v = (val or "").strip()
         if not v:

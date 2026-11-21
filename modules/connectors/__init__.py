@@ -118,6 +118,8 @@ OAUTH_CONNECTORS = {
 ALL_PLATFORMS = {**CONNECTORS, **OAUTH_CONNECTORS}
 
 
+# Para qué sirve: devuelve el catálogo de los 5 conectores de API abierta indicando si están listos para usar.
+# Cómo funciona: recorre `CONNECTORS` y verifica `youtube_configured()` y `GITHUB_TOKEN`.
 def connectors_catalog() -> list:
     """Devuelve catálogo de los 5 conectores de API abierta (compatibilidad Fase 2)."""
     out = []
@@ -135,6 +137,8 @@ def connectors_catalog() -> list:
     return out
 
 
+# Para qué sirve: genera la matriz completa y honesta de capacidades/límites de todas las plataformas soportadas.
+# Cómo funciona: cruza `ALL_PLATFORMS` con `oauth_provider_status()` y conexiones activas en BD para calcular `ready`.
 def platforms_capabilities_catalog(active_connections: Optional[list] = None) -> list:
     """
     Devuelve la matriz completa y honesta de capacidades para TODAS las plataformas
@@ -165,6 +169,8 @@ def platforms_capabilities_catalog(active_connections: Optional[list] = None) ->
     return out
 
 
+# Para qué sirve: despacha la extracción autorizada al conector correspondiente adaptando sus argumentos.
+# Cómo funciona: busca el handler en `ALL_PLATFORMS` y le pasa solo los flags/tokens que esa plataforma admite.
 def fetch_from_connector(
     platform: str,
     handle: str,

@@ -115,11 +115,15 @@ _SARCASM_HUMOR_RE = re.compile(
 _QUOTE_RE = re.compile(r'["“«][^"”»]{6,}["”»]')
 
 
+# Para qué sirve: elimina tildes del texto preservando letras base para simplificar el análisis léxico.
+# Cómo funciona: descompone en NFD con `unicodedata` y filtra marcas diacríticas (`Mn`).
 def _strip_accents(text: str) -> str:
     nfd = unicodedata.normalize("NFD", str(text or ""))
     return "".join(ch for ch in nfd if unicodedata.category(ch) != "Mn")
 
 
+# Para qué sirve: reduce repeticiones expresivas de letras ('amigoooo' -> 'amigo') para que coincidan con el diccionario.
+# Cómo funciona: colapsa 3+ letras iguales seguidas y repeticiones de vocal final con regex.
 def _collapse_elongations(word: str) -> str:
     """Reduce repeticiones expresivas de letras ('amigoooo' -> 'amigo', 'hermanitooo' -> 'hermanito')."""
     # Conserva 'll', 'rr', 'cc', 'ee' en palabras válidas reduciendo solo 3+ repeticiones (y 2+ al final)
@@ -128,6 +132,8 @@ def _collapse_elongations(word: str) -> str:
     return w
 
 
+# Para qué sirve: prepara comentarios/bios expandiendo abreviaturas y corrigiendo typos sin perder puntuación relevante.
+# Cómo funciona: normaliza acentos, tokeniza palabras/signos, colapsa alargamientos y sustituye según `_TYPO_MAP`.
 def normalize_for_relational(text: str) -> str:
     """Normaliza tildes, alargamientos y abreviaturas/typos preservando estructura de palabras."""
     clean = _strip_accents(text).lower()
@@ -143,6 +149,8 @@ def normalize_for_relational(text: str) -> str:
     return " ".join(norm_tokens)
 
 
+# Para qué sirve: reduce diminutivos regulares en español al lema base para emparejar variaciones no listadas.
+# Cómo funciona: recorta sufijos `-cito/-cita/-ito/-ita/-illo/-illa/-ico/-ica` en palabras de 6+ letras.
 def _strip_diminutive(word: str) -> str:
     """Reduce diminutivos regulares al lema base para emparejar variantes no listadas."""
     for suf, repl in (("cito", ""), ("cita", ""), ("illo", "o"), ("illa", "a"), ("ito", "o"), ("ita", "a"), ("ico", "o"), ("ica", "a")):
@@ -151,6 +159,8 @@ def _strip_diminutive(word: str) -> str:
     return word
 
 
+# Para qué sirve: detecta señales de lenguaje relacional en un texto clasificándolas estrictamente como `explicit` o `ambiguous`.
+# Cómo funciona: busca raíces de `_RELATIONAL_LEXICON` y `_RELATIONAL_EMOJIS`, evalúa sarcasmo/3.ª persona/citas/polisemia y asigna confianza.
 def analyze_single_text_relational(
     text: str,
     source_handle: str = "",
@@ -271,6 +281,8 @@ def analyze_single_text_relational(
 # ---------------------------------------------------------------------------
 # 2. Verificación contextual opcional con LLM (clasificada como `model_inference`)
 # ---------------------------------------------------------------------------
+# Para qué sirve: extrae de forma tolerante un objeto JSON desde la respuesta cruda de un LLM.
+# Cómo funciona: limpia bloques Markdown ```json y hace fallback con regex al primer `{...}` válido.
 def _extract_json(raw: str) -> Optional[dict]:
     if not raw:
         return None
@@ -290,6 +302,8 @@ def _extract_json(raw: str) -> Optional[dict]:
     return None
 
 
+# Para qué sirve: envía un prompt de desambiguación al proveedor LLM configurado (Gemini, Ollama u OpenAI).
+# Cómo funciona: prueba los endpoints del proveedor solicitado/auto, parsea el JSON y retorna `(dict, motor)` o fallback local.
 def _call_relational_llm(prompt: str, provider: str) -> tuple:
     """Devuelve `(parsed_json, engine_name)` o `(None, 'local_rules')`."""
     prov = (provider or "local").strip().lower()
@@ -367,6 +381,8 @@ def _call_relational_llm(prompt: str, provider: str) -> tuple:
     return None, "local_rules"
 
 
+# Para qué sirve: refina hasta 10 señales `ambiguous` con un LLM para separar sarcasmo/coloquialismo de vínculos reales.
+# Cómo funciona: arma un lote JSON, consulta `_call_relational_llm` y reclasifica las coincidencias plausibles como `model_inference`.
 def _refine_ambiguous_signals_with_llm(signals: list, provider: str) -> list:
     """
     Evalúa en lote hasta 10 señales `ambiguous` usando un LLM para distinguir uso coloquial/sarcasmo
@@ -424,6 +440,8 @@ def _refine_ambiguous_signals_with_llm(signals: list, provider: str) -> list:
 # ---------------------------------------------------------------------------
 # 3. Pipeline completo sobre un caso
 # ---------------------------------------------------------------------------
+# Para qué sirve: ejecuta el motor de lenguaje relacional sobre todos los comentarios y publicaciones de un caso.
+# Cómo funciona: analiza cada texto con `analyze_single_text_relational` usando `reciprocal_pairs` y opcionalmente refina con LLM.
 def analyze_case_relational_language(
     comments: list,
     posts: list,

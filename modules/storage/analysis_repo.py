@@ -10,6 +10,8 @@ from .cases_repo import _get_primary_entity_id, case_exists, record_case_run
 # ---------------------------------------------------------------------------
 # Fase 3 :: Galería local y persistencia de Análisis Visual (VLM + dHash + OCR)
 # ---------------------------------------------------------------------------
+# Para qué sirve: Registra una imagen en la galería del caso evitando duplicados por hash SHA-256.
+# Cómo funciona: Consulta `media_items` por `(case_id, sha256)` e inserta una nueva fila solo si no existe, devolviendo sus JSON decodificados.
 def add_case_gallery_image(
     case_id: str,
     filename: str,
@@ -80,6 +82,8 @@ def add_case_gallery_image(
     return d
 
 
+# Para qué sirve: Actualiza en SQLite el dHash, texto OCR, etiquetas y JSON del análisis visual de un medio.
+# Cómo funciona: Extrae las etiquetas de `themes`, ejecuta `UPDATE media_items` filtrando por `id` y `case_id`, y refresca `updated_at` del caso.
 def update_media_vision(case_id: str, media_id: int, vision_result: dict) -> bool:
     """Guarda el resultado de análisis visual (dHash, OCR, etiquetas y JSON completo) para una foto."""
     if not case_exists(case_id):
@@ -112,6 +116,8 @@ def update_media_vision(case_id: str, media_id: int, vision_result: dict) -> boo
     return False
 
 
+# Para qué sirve: Obtiene las imágenes del caso enriquecidas con el caption de sus posts asociados para análisis visual.
+# Cómo funciona: Consulta `media_items` y `posts`, mapea `source_url` al texto del post y filtra pendientes si `only_pending=True`.
 def get_case_media_for_vision(case_id: str, only_pending: bool = False) -> list:
     """Devuelve las imágenes del caso junto con el texto de contexto de posts asociados."""
     if not case_exists(case_id):
@@ -146,6 +152,8 @@ def get_case_media_for_vision(case_id: str, only_pending: bool = False) -> list:
     return out
 
 
+# Para qué sirve: Genera un resumen visual consolidado de todas las imágenes del caso.
+# Cómo funciona: Recupera las fotos con `get_case_media_for_vision` y delega la agregación de intereses y duplicados a `summarize_case_vision`.
 def get_case_vision_summary(case_id: str) -> Optional[dict]:
     """Devuelve galería completa + agregación de intereses visuales y duplicados dHash del caso."""
     from modules.vision_analysis import summarize_case_vision
@@ -164,6 +172,8 @@ def get_case_vision_summary(case_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # Fase 4 :: Corpus y Persistencia de Análisis NLP (Temas, NER, Sentimiento)
 # ---------------------------------------------------------------------------
+# Para qué sirve: Construye el corpus textual y visual del sujeto para ejecutar análisis NLP.
+# Cómo funciona: Reúne handles, biografías de perfiles no rechazados, posts, comentarios del sujeto y temas visuales de `get_case_vision_summary`.
 def get_case_corpus_for_nlp(case_id: str) -> Optional[dict]:
     """Recopila biografías, posts, comentarios y temas visuales (Fase 3) para el motor NLP."""
     if not case_exists(case_id):
@@ -210,6 +220,8 @@ def get_case_corpus_for_nlp(case_id: str) -> Optional[dict]:
     }
 
 
+# Para qué sirve: Guarda los resultados agregados de NLP en el caso y actualiza el sentimiento por comentario.
+# Cómo funciona: Serializa el payload en `cases.nlp_json` e itera sobre `comment_sentiments` ejecutando `UPDATE comments`.
 def save_case_nlp_analysis(case_id: str, nlp_result: dict) -> bool:
     """Guarda el análisis NLP en `cases.nlp_json` y actualiza `comments.sentiment`."""
     if not case_exists(case_id):
@@ -230,6 +242,8 @@ def save_case_nlp_analysis(case_id: str, nlp_result: dict) -> bool:
     return True
 
 
+# Para qué sirve: Recupera el análisis NLP previamente guardado para un caso.
+# Cómo funciona: Lee `cases.nlp_json`, lo decodifica y retorna `{"analyzed": False}` si aún está vacío.
 def get_case_nlp_analysis(case_id: str) -> Optional[dict]:
     """Devuelve el último análisis NLP persistido para el caso."""
     with _connect() as conn:
@@ -245,6 +259,8 @@ def get_case_nlp_analysis(case_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # Fase 5 :: Grafo de Interacciones y Círculo Cercano (SNA)
 # ---------------------------------------------------------------------------
+# Para qué sirve: Reúne las entradas necesarias para construir el grafo de análisis de redes sociales (SNA) del caso.
+# Cómo funciona: Consulta handles del sujeto, interacciones, comentarios y señales relacionales validadas en SQLite.
 def get_case_sna_inputs(case_id: str) -> Optional[dict]:
     """Recopila handles del sujeto, interacciones y comentarios para el motor SNA."""
     with _connect() as conn:
@@ -299,6 +315,8 @@ def get_case_sna_inputs(case_id: str) -> Optional[dict]:
     }
 
 
+# Para qué sirve: Calcula el grafo SNA del caso, lo persiste en `cases.sna_json` y opcionalmente deja bitácora.
+# Cómo funciona: Carga datos con `get_case_sna_inputs`, invoca `build_case_sna`, guarda el JSON y registra un run si `record_run=True`.
 def compute_and_save_case_sna(case_id: str, record_run: bool = False) -> Optional[dict]:
     """Ejecuta el motor SNA, guarda el grafo en `cases.sna_json` y devuelve el resultado."""
     from modules.sna_graph import build_case_sna
@@ -329,6 +347,8 @@ def compute_and_save_case_sna(case_id: str, record_run: bool = False) -> Optiona
 # ---------------------------------------------------------------------------
 # Módulo Investigación Autorizada :: Conexiones OAuth2, Evidencias y Lenguaje Relacional
 # ---------------------------------------------------------------------------
+# Para qué sirve: Crea o actualiza una conexión autorizada OAuth2 almacenando el token ya cifrado.
+# Cómo funciona: Ejecuta un upsert sobre `platform_connections` usando `conn_id` o un UUID nuevo y retorna los metadatos públicos.
 def save_platform_connection(
     platform: str,
     account_label: str,
@@ -384,6 +404,8 @@ def save_platform_connection(
     return d
 
 
+# Para qué sirve: Lista las conexiones autorizadas activas sin exponer secretos cifrados.
+# Cómo funciona: Selecciona únicamente columnas seguras de `platform_connections` (filtrando por `platform` si se indica) y decodifica `scopes`.
 def list_platform_connections(platform: Optional[str] = None) -> list:
     """Lista conexiones autorizadas SIN devolver nunca `token_encrypted`."""
     with _connect() as conn:
@@ -416,6 +438,8 @@ def list_platform_connections(platform: Optional[str] = None) -> list:
     return out
 
 
+# Para qué sirve: Recupera el registro completo incluido `token_encrypted` para uso interno del backend.
+# Cómo funciona: Consulta `platform_connections` por `id` verificando `status = 'active'` y decodifica `scopes_json`.
 def get_platform_connection_secret(conn_id: str) -> Optional[dict]:
     """Uso exclusivo interno del backend para descifrar un token OAuth2."""
     if not conn_id:
@@ -432,12 +456,17 @@ def get_platform_connection_secret(conn_id: str) -> Optional[dict]:
     return d
 
 
+# Para qué sirve: Revoca y borra una conexión OAuth2 almacenada en SQLite.
+# Cómo funciona: Ejecuta `DELETE FROM platform_connections WHERE id = ?` y devuelve si eliminó alguna fila.
 def delete_platform_connection(conn_id: str) -> bool:
+    """Elimina una conexión OAuth2 almacenada por su identificador."""
     with _connect() as conn:
         cur = conn.execute("DELETE FROM platform_connections WHERE id = ?", (conn_id,))
         return cur.rowcount > 0
 
 
+# Para qué sirve: Obtiene la trazabilidad de capturas, registros de evidencia y reacciones de un caso.
+# Cómo funciona: Consulta `profile_snapshots`, `evidence_records` y `reactions` enlazadas a `posts`, decodificando sus JSONs.
 def get_case_evidences(case_id: str, limit: int = 120) -> Optional[dict]:
     """Devuelve trazabilidad completa: snapshots de perfil, registros de evidencia y reacciones."""
     if not case_exists(case_id):
@@ -484,6 +513,8 @@ def get_case_evidences(case_id: str, limit: int = 120) -> Optional[dict]:
     }
 
 
+# Para qué sirve: Guarda señales de lenguaje relacional detectadas conservando las decisiones humanas ya revisadas.
+# Cómo funciona: Mapea `evidence_records`, identifica claves revisadas no pendientes, limpia `pending` si aplica e inserta señales nuevas.
 def save_relational_signals(case_id: str, signals: list, replace_pending: bool = True) -> dict:
     """
     Persiste señales de lenguaje relacional detectadas.
@@ -571,6 +602,8 @@ def save_relational_signals(case_id: str, signals: list, replace_pending: bool =
     return {"inserted": inserted, "preserved_reviewed": len(reviewed_keys)}
 
 
+# Para qué sirve: Lista las señales relacionales del caso con trazabilidad a evidencia y estadísticas resumidas.
+# Cómo funciona: Aplica filtros SQL dinámicos con `LEFT JOIN evidence_records`, decodifica `ambiguity_flags` y calcula conteos en memoria.
 def list_relational_signals(
     case_id: str,
     category: Optional[str] = None,
@@ -640,6 +673,8 @@ def list_relational_signals(
     return {"case_id": case_id, "stats": stats, "signals": signals}
 
 
+# Para qué sirve: Permite al analista validar, reclasificar o descartar manualmente una señal relacional.
+# Cómo funciona: Valida `review_status`, actualiza la fila en `relational_signals` con nota/fecha y retorna el registro actualizado.
 def update_relational_signal_review(
     case_id: str,
     signal_id: int,

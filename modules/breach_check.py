@@ -32,11 +32,15 @@ _KEYWORDS_PASSWORD = ("password", "contraseña", "hash", "credential")
 _KEYWORDS_PHONE = ("phone", "teléfono", "telefono", "mobile", "sms")
 
 
+# Para qué sirve: obtiene la API key de HIBP de forma centralizada.
+# Cómo funciona: prioriza el parámetro recibido y, si está vacío, lee `HIBP_API_KEY` del entorno.
 def _get_hibp_api_key(api_key: str = None) -> str:
     """Obtiene la API key de HIBP desde el argumento o la variable de entorno HIBP_API_KEY."""
     return (api_key or os.environ.get("HIBP_API_KEY", "")).strip()
 
 
+# Para qué sirve: consulta brechas de datos asociadas a un correo en Have I Been Pwned API v3 (si hay API key).
+# Cómo funciona: usa `cached_get_json` con TTL de 1 h, maneja códigos 404/401/429 y normaliza cada brecha al esquema común.
 def check_hibp_email(email: str, api_key: str = None, timeout: int = 12) -> dict:
     """
     Consulta Have I Been Pwned API v3 para un correo electrónico.
@@ -92,7 +96,8 @@ def check_hibp_email(email: str, api_key: str = None, timeout: int = 12) -> dict
         })
     return {"source": "HIBP", "breaches": breaches, "note": f"{len(breaches)} brechas en HIBP."}
 
-
+# Para qué sirve: unifica las respuestas heterogéneas de XposedOrNot al mismo esquema que HIBP.
+# Cómo funciona: procesa `/v1/breach-analytics` y `/v1/check-email`, separa `xposed_data` por `;`/`,` y extrae el nivel de riesgo.
 def parse_xposedornot_payload(data: dict) -> dict:
     """
     Normaliza la respuesta JSON de XposedOrNot (`/v1/breach-analytics` o `/v1/check-email`)
@@ -156,6 +161,8 @@ def parse_xposedornot_payload(data: dict) -> dict:
     return {"breaches": breaches, "risk_label": risk_label, "risk_score": risk_score}
 
 
+# Para qué sirve: consulta brechas públicas gratuitas para un correo en XposedOrNot.
+# Cómo funciona: llama a `/v1/breach-analytics` usando `cached_get_json` (TTL 1 h) y normaliza con `parse_xposedornot_payload`.
 def check_xposedornot_email(email: str, timeout: int = 12) -> dict:
     """
     Consulta la API pública y gratuita de XposedOrNot para detectar si un correo
@@ -201,6 +208,8 @@ def check_xposedornot_email(email: str, timeout: int = 12) -> dict:
     }
 
 
+# Para qué sirve: evita brechas duplicadas cuando HIBP y XposedOrNot reportan el mismo incidente.
+# Cómo funciona: agrupa por nombre alfanumérico en minúscula, combina `sources`/`data_classes` y ordena por fecha descendente.
 def _merge_breaches(listas: list) -> list:
     """
     Deduplica brechas entre HIBP y XposedOrNot por nombre normalizado,
@@ -239,6 +248,8 @@ def _merge_breaches(listas: list) -> list:
     return sorted(mapa.values(), key=lambda x: str(x.get("date", "")), reverse=True)
 
 
+# Para qué sirve: orquesta la auditoría completa de brechas de un correo y genera alertas defensivas.
+# Cómo funciona: consulta HIBP + XposedOrNot, deduplica, busca exposición de contraseñas/teléfono y guarda JSON opcional en `out_dir`.
 def check_email_breaches(email: str, out_dir: Path = None, api_key: str = None) -> dict:
     """
     Orquesta la verificación de brechas para un correo usando XposedOrNot (siempre)
@@ -321,6 +332,8 @@ def check_email_breaches(email: str, out_dir: Path = None, api_key: str = None) 
     return resultado
 
 
+# Para qué sirve: audita si una contraseña propia aparece en filtraciones sin exponer la clave real ni su hash completo.
+# Cómo funciona: envía solo los primeros 5 chars del SHA-1 a `api.pwnedpasswords.com/range` (con `Add-Padding`) y compara el sufijo en local.
 def check_password_k_anonymity(password: str, timeout: int = 10) -> dict:
     """
     Audita una contraseña PROPIA usando HIBP Pwned Passwords (protocolo k-Anonymity):
@@ -366,6 +379,8 @@ def check_password_k_anonymity(password: str, timeout: int = 10) -> dict:
     return {"compromised": False, "count": 0, "prefix_sent": prefix, "error": None}
 
 
+# Para qué sirve: da formato legible de secciones al resultado de brechas para renderizar HTML y PDF.
+# Cómo funciona: agrupa resumen de estado/riesgo, listado de brechas con sus datos expuestos y recomendaciones.
 def format_breach_report(res: dict) -> dict:
     """Convierte el resultado de `check_email_breaches` en secciones legibles para HTML y PDF."""
     if not res:
@@ -404,6 +419,8 @@ def format_breach_report(res: dict) -> dict:
     return secciones
 
 
+# Para qué sirve: transforma las brechas encontradas en filas planas listas para exportar a CSV.
+# Cómo funciona: aplana listas (`sources` con `+`, `data_classes` con `; `) en un diccionario por brecha.
 def breaches_csv_rows(res: dict) -> list:
     """Genera filas planas para exportar `brechas_detectadas.csv`."""
     email = res.get("email", "")

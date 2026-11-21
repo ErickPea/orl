@@ -109,10 +109,14 @@ VISUAL_THEME_TAXONOMY = {
 }
 
 
+# Para qué sirve: obtiene la fecha y hora actual en formato ISO local legible para sellar análisis visuales.
+# Cómo funciona: formatea `datetime.now()` como `YYYY-MM-DD HH:MM:SS`.
 def _now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# Para qué sirve: normaliza textos sin tildes ni mayúsculas para comparar etiquetas OCR y categorías.
+# Cómo funciona: descompone en NFD con `unicodedata`, filtra marcas diacríticas (`Mn`) y colapsa espacios.
 def _norm(text: str) -> str:
     if not text:
         return ""
@@ -124,6 +128,8 @@ def _norm(text: str) -> str:
 # ---------------------------------------------------------------------------
 # Capacidades y detección de motores disponibles
 # ---------------------------------------------------------------------------
+# Para qué sirve: detecta si Ollama local tiene modelos de visión listos para analizar imágenes.
+# Cómo funciona: consulta `/api/tags` y filtra nombres con pistas multimodales (`vl`, `llava`, `vision`, `gemma3`, etc.).
 def _check_ollama(timeout: float = 1.5) -> dict:
     base_url = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
     preferred = os.environ.get("OLLAMA_VISION_MODEL", "").strip()
@@ -146,6 +152,8 @@ def _check_ollama(timeout: float = 1.5) -> dict:
         return {"available": False, "server_up": False, "url": base_url, "models": [], "selected_model": preferred}
 
 
+# Para qué sirve: informa qué motores de visión (`dHash`, Tesseract OCR, Ollama, Gemini, OpenAI) están activos.
+# Cómo funciona: evalúa `PILLOW_OK`, `shutil.which("tesseract")`, `_check_ollama()` y claves API en el entorno.
 def vision_capabilities(probe_ollama: bool = True) -> dict:
     """Informa qué motores de análisis visual están listos en la máquina actual."""
     ollama = _check_ollama() if probe_ollama else {"available": False, "server_up": False, "models": [], "selected_model": ""}
@@ -175,6 +183,8 @@ def vision_capabilities(probe_ollama: bool = True) -> dict:
 # ---------------------------------------------------------------------------
 # Hash Perceptual (dHash 64-bit) y señales visuales locales con Pillow
 # ---------------------------------------------------------------------------
+# Para qué sirve: genera una huella visual de 64 bits resistente a redimensionado y recompresión JPEG.
+# Cómo funciona: corrige orientación EXIF, escala a `(hash_size+1) x hash_size` en grises y compara gradientes horizontales.
 def compute_dhash_from_image(img: "Image.Image", hash_size: int = 8) -> str:
     """
     Calcula un hash perceptual dHash de 64 bits (16 hex chars) usando solo Pillow.
@@ -192,6 +202,8 @@ def compute_dhash_from_image(img: "Image.Image", hash_size: int = 8) -> str:
     return f"{bits:0{hash_size * hash_size // 4}x}"
 
 
+# Para qué sirve: mide la similitud visual entre dos hashes dHash contando bits distintos.
+# Cómo funciona: aplica XOR entre ambos enteros hexadecimales y devuelve `.bit_count()`.
 def hamming_distance(hash_a: str, hash_b: str) -> Optional[int]:
     """Distancia de Hamming entre dos dHashes hexadecimales (0 = idénticas, <= 10 = muy similares)."""
     if not hash_a or not hash_b or len(hash_a) != len(hash_b):
@@ -203,6 +215,8 @@ def hamming_distance(hash_a: str, hash_b: str) -> Optional[int]:
         return None
 
 
+# Para qué sirve: obtiene la paleta de colores hexadecimales dominantes de una imagen.
+# Cómo funciona: reduce la imagen a 48x48, cuantiza a `count` colores (MEDIANCUT) y ordena por frecuencia.
 def _dominant_colors(img: "Image.Image", count: int = 3) -> list:
     """Extrae los colores hex predominantes reduciendo la imagen a una paleta cuantizada."""
     try:
@@ -221,6 +235,8 @@ def _dominant_colors(img: "Image.Image", count: int = 3) -> list:
         return []
 
 
+# Para qué sirve: extrae señales visuales locales (dHash, dimensiones, relación de aspecto y paleta) desde bytes.
+# Cómo funciona: abre el stream con Pillow, aplica `exif_transpose` y deduce formato visual aproximado por aspect ratio.
 def _extract_pillow_signals(image_bytes: bytes) -> dict:
     if not PILLOW_OK or not image_bytes:
         return {"dhash": "", "dimensions": {}, "dominant_colors": [], "visual_hints": []}
@@ -249,6 +265,8 @@ def _extract_pillow_signals(image_bytes: bytes) -> dict:
         return {"dhash": "", "dimensions": {}, "dominant_colors": [], "visual_hints": []}
 
 
+# Para qué sirve: extrae texto legible impreso dentro de una imagen de forma local mediante OCR.
+# Cómo funciona: escribe un PNG temporal, invoca `tesseract ... stdout --psm 6` (máx. 15 s) y borra el temporal en `finally`.
 def _run_tesseract_ocr(image_bytes: bytes) -> str:
     """Ejecuta OCR local con `tesseract` si está instalado en el sistema."""
     if not shutil.which("tesseract") or not image_bytes:
@@ -278,6 +296,8 @@ def _run_tesseract_ocr(image_bytes: bytes) -> str:
 # ---------------------------------------------------------------------------
 # Clasificador temático sobre contexto (alt-text, caption, OCR, filename)
 # ---------------------------------------------------------------------------
+# Para qué sirve: mapea texto contextual de imágenes (OCR, caption, alt-text) a categorías de interés con evidencia literal.
+# Cómo funciona: busca coincidencias exactas de palabra contra `VISUAL_THEME_TAXONOMY` y sube confianza a `ALTA` con 2+ hits.
 def classify_themes_from_text(text: str, base_confidence: str = "MEDIA") -> list:
     """Clasifica un texto en la taxonomía de intereses visuales devolviendo evidencia literal."""
     norm = _norm(text)
@@ -317,6 +337,8 @@ _VLM_PROMPT = (
 )
 
 
+# Para qué sirve: extrae un diccionario JSON válido desde la salida cruda de un modelo VLM.
+# Cómo funciona: limpia bloques Markdown ```json y hace fallback por regex sobre `{...}`.
 def _extract_json_block(raw_text: str) -> Optional[dict]:
     if not raw_text:
         return None
@@ -337,6 +359,8 @@ def _extract_json_block(raw_text: str) -> Optional[dict]:
     return None
 
 
+# Para qué sirve: analiza una imagen localmente usando un modelo multimodal en Ollama.
+# Cómo funciona: codifica los bytes en base64, llama a `/api/generate` con `format="json"` y parsea la respuesta.
 def _call_ollama_vision(image_bytes: bytes, model: str, base_url: str, timeout: int = 45, prompt: Optional[str] = None) -> Optional[dict]:
     b64 = base64.b64encode(image_bytes).decode("ascii")
     r = requests.post(
@@ -355,6 +379,8 @@ def _call_ollama_vision(image_bytes: bytes, model: str, base_url: str, timeout: 
     return _extract_json_block((r.json() or {}).get("response") or "")
 
 
+# Para qué sirve: analiza una imagen mediante Google Gemini Vision (AI Studio o Vertex Express Mode).
+# Cómo funciona: envía el payload base64 + `inline_data` en orden de endpoint según el prefijo de `GEMINI_API_KEY`.
 def _call_gemini_vision(image_bytes: bytes, mime_type: str = "image/jpeg", timeout: int = 35, prompt: Optional[str] = None) -> Optional[dict]:
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -401,6 +427,8 @@ def _call_gemini_vision(image_bytes: bytes, mime_type: str = "image/jpeg", timeo
     return None
 
 
+# Para qué sirve: analiza una imagen usando la API de visión de OpenAI (`gpt-4o-mini` por defecto).
+# Cómo funciona: incrusta `data:{mime};base64,{b64}` en `/v1/chat/completions` pidiendo `json_object`.
 def _call_openai_vision(image_bytes: bytes, mime_type: str = "image/jpeg", timeout: int = 35, prompt: Optional[str] = None) -> Optional[dict]:
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -433,6 +461,8 @@ def _call_openai_vision(image_bytes: bytes, mime_type: str = "image/jpeg", timeo
     return _extract_json_block(text)
 
 
+# Para qué sirve: previene ataques SSRF asegurando que toda URL remota apunte únicamente a Internet público.
+# Cómo funciona: exige HTTP(S), rechaza dominios `.local`/`.internal`/`localhost` y verifica `ip_obj.is_global` vía IP literal o `getaddrinfo`.
 def is_safe_public_http_url(url: str) -> bool:
     """
     Valida contra SSRF que la URL sea HTTP(S) hacia un host público global
@@ -479,6 +509,8 @@ def is_safe_public_http_url(url: str) -> bool:
     return True
 
 
+# Para qué sirve: descarga una imagen pública de forma segura evitando SSRF por redirecciones y desbordamiento de memoria.
+# Cómo funciona: valida cada salto `Location` con `is_safe_public_http_url`, exige `Content-Type: image/*` y corta en `12 MB`.
 def download_public_image(url: str, timeout: int = 12, max_redirects: int = 3) -> tuple:
     """Descarga una imagen pública validando SSRF por salto y límite de tamaño (12 MB). Devuelve (bytes, mime_type)."""
     cur_url = (url or "").strip()
@@ -532,6 +564,8 @@ def download_public_image(url: str, timeout: int = 12, max_redirects: int = 3) -
 # ---------------------------------------------------------------------------
 # Función principal de análisis por imagen
 # ---------------------------------------------------------------------------
+# Para qué sirve: analiza una imagen combinando métricas Pillow, OCR local y opcionalmente un VLM para extraer temas y descripción.
+# Cómo funciona: calcula dHash/paleta/dimensiones, consulta Ollama/Gemini/OpenAI según `provider` o usa `_run_tesseract_ocr` + contexto.
 def analyze_image_bytes(
     image_bytes: bytes,
     alt_text: str = "",
@@ -662,6 +696,8 @@ def analyze_image_bytes(
 # ---------------------------------------------------------------------------
 # Agregación de intereses visuales y detección de duplicados por caso
 # ---------------------------------------------------------------------------
+# Para qué sirve: consolida temas visuales, fragmentos OCR y pares de fotos similares en toda la galería del caso.
+# Cómo funciona: agrega conteos/evidencias por tema y compara todos los `dhash` por pares buscando Hamming <= `similarity_threshold`.
 def summarize_case_vision(media_items: list, similarity_threshold: int = 10) -> dict:
     """
     Consolida los resultados de visión de toda la galería de un caso:
@@ -763,6 +799,8 @@ def summarize_case_vision(media_items: list, similarity_threshold: int = 10) -> 
 # ---------------------------------------------------------------------------
 # Módulo B y C :: Comparación visual entre perfiles y Pistas de Ubicación (GeoHints)
 # ---------------------------------------------------------------------------
+# Para qué sirve: detecta fotos compartidas o re-subidas entre dos perfiles distintos (ej. sujeto vs. cuenta amiga).
+# Cómo funciona: calcula `hamming_distance` entre sus `dhash` y devuelve pares dentro de `DHASH_HAMMING_THRESHOLD` ordenados por similitud.
 def compare_media_between_profiles(
     media_a: list,
     media_b: list,
@@ -848,6 +886,8 @@ _GEO_VLM_PROMPT = (
 )
 
 
+# Para qué sirve: normaliza las pistas geográficas visuales (`flora`, `architecture`, `ocr`, `climate`, `object`) devueltas por un VLM.
+# Cómo funciona: parsea JSON (o cadena JSON) y mapea cada categoría al esquema `{hint_type, value, confidence, evidence_quote, source}`.
 def _parse_geo_vlm_payload(raw) -> list:
     data = raw
     if isinstance(raw, str):
@@ -894,6 +934,8 @@ def _parse_geo_vlm_payload(raw) -> list:
     return hints
 
 
+# Para qué sirve: extrae y agrupa pistas visuales de ubicación (`GeoHints`) desde EXIF GPS, VLM opcional y contexto OCR/caption.
+# Cómo funciona: prioriza EXIF (`conf=0.98`), invoca `vlm_client` si existe, registra OCR literal y busca en `_GEO_HINT_LEXICON`.
 def extract_geo_hints(
     image_path: Optional[Path] = None,
     vlm_client=None,
@@ -966,11 +1008,15 @@ def extract_geo_hints(
     return grouped
 
 
+# Para qué sirve: fabrica un cliente VLM listo para inyectar en `extract_geo_hints` usando la foto local o URL pública.
+# Cómo funciona: devuelve `_client`, que carga los bytes de la imagen (disco o `download_public_image`) y consulta Gemini -> OpenAI -> Ollama.
 def build_geo_vlm_client(local_path: Optional[Path] = None, source_url: str = ""):
     """
     Construye un callable `(image_path, prompt) -> dict` que obtiene bytes reales de la foto
     (disco local o URL pública) y consulta Gemini / OpenAI / Ollama si están configurados.
     """
+    # Para qué sirve: ejecuta la consulta VLM sobre la imagen cargada para un prompt geográfico específico.
+    # Cómo funciona: lee bytes locales o remotos (anti-SSRF) e intenta en cascada Gemini, OpenAI y Ollama.
     def _client(img_path: Optional[Path], prompt: str):
         img_bytes = b""
         mime = "image/jpeg"

@@ -58,6 +58,8 @@ _COUNTRY_ISO = {
 }
 
 
+# Para qué sirve: informa qué APIs públicas y de buscadores están disponibles para búsqueda por nombre.
+# Cómo funciona: revisa `REQUESTS_OK` y la presencia de variables `GOOGLE_CSE_*` y `BRAVE_API_KEY` en el entorno.
 def name_search_capabilities() -> dict:
     """Informa qué APIs de búsqueda por nombre están disponibles/configuradas."""
     return {
@@ -70,12 +72,16 @@ def name_search_capabilities() -> dict:
     }
 
 
+# Para qué sirve: elimina tildes y diacríticos para comparar nombres propios sin sensibilidad a acentos.
+# Cómo funciona: normaliza en NFKD con `unicodedata` y descarta caracteres combinantes.
 def strip_accents(text: str) -> str:
     """Elimina tildes/diacríticos para comparar nombres de forma insensible a acentos."""
     nfkd = unicodedata.normalize("NFKD", text or "")
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
+# Para qué sirve: extrae variantes limpias del nombre y deriva posibles usernames para pivotar búsquedas.
+# Cómo funciona: tokeniza el nombre ASCII y combina primer nombre + último/primer apellido en formatos comunes (`3..30` chars).
 def build_name_variants(full_name: str) -> dict:
     """
     Genera variantes limpias del nombre y sugiere posibles usernames derivados
@@ -111,6 +117,8 @@ def build_name_variants(full_name: str) -> dict:
     }
 
 
+# Para qué sirve: puntúa coincidencias (`ALTA`/`MEDIA`/`BAJA`) para mitigar falsos positivos por homónimos.
+# Cómo funciona: comprueba si todo el nombre o todos sus tokens aparecen en `text_blob` y si coincide ubicación o keyword.
 def _score_match(text_blob: str, full_name: str, city: str = "", country: str = "", keyword: str = "") -> str:
     """
     Evalúa el nivel de coincidencia para reducir falsos positivos por homónimos:
@@ -135,6 +143,8 @@ def _score_match(text_blob: str, full_name: str, city: str = "", country: str = 
     return "BAJA"
 
 
+# Para qué sirve: identifica el nombre legible de la red social o plataforma académica a partir de una URL.
+# Cómo funciona: compara el dominio contra `SOCIAL_PLATFORMS` y sufijos conocidos (`orcid.org`, `openalex.org`, `wikipedia.org`).
 def _detect_network_from_url(url: str) -> str:
     """Identifica el nombre legible de la red social a partir del dominio de la URL."""
     host = urlparse(url or "").netloc.lower().replace("www.", "")
@@ -154,6 +164,8 @@ def _detect_network_from_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 # 1) APIs públicas oficiales SIN API key
 # ---------------------------------------------------------------------------
+# Para qué sirve: busca usuarios públicos en GitHub filtrando por nombre completo y ciudad/país.
+# Cómo funciona: consulta `/search/users`, enriquece los primeros 5 perfiles en `/users/{login}` y puntúa con `_score_match`.
 def search_github_by_name(full_name: str, city: str = "", country: str = "",
                           max_results: int = 8, timeout: int = 8) -> list:
     """
@@ -226,6 +238,8 @@ def search_github_by_name(full_name: str, city: str = "", country: str = "",
     return resultados
 
 
+# Para qué sirve: localiza perfiles académicos públicos e instituciones asociadas en ORCID sin API key.
+# Cómo funciona: consulta `/v3.0/expanded-search/` por `given-names`/`family-name` y puntúa coincidencia con `_score_match`.
 def search_orcid_by_name(full_name: str, city: str = "", country: str = "",
                          max_results: int = 6, timeout: int = 8) -> list:
     """
@@ -276,6 +290,8 @@ def search_orcid_by_name(full_name: str, city: str = "", country: str = "",
     return resultados
 
 
+# Para qué sirve: consulta autores y afiliaciones académicas públicas en el índice abierto OpenAlex.
+# Cómo funciona: busca por nombre en `api.openalex.org/authors` y filtra por código ISO-2 del país si se conoce en `_COUNTRY_ISO`.
 def search_openalex_by_name(full_name: str, city: str = "", country: str = "",
                             max_results: int = 6, timeout: int = 8) -> list:
     """
@@ -328,6 +344,8 @@ def search_openalex_by_name(full_name: str, city: str = "", country: str = "",
     return resultados
 
 
+# Para qué sirve: detecta menciones enciclopédicas públicas en Wikipedia en español por nombre y zona.
+# Cómo funciona: consulta `es.wikipedia.org/w/api.php?action=query&list=search`, limpia HTML del snippet y evalúa coincidencia.
 def search_wikipedia_by_name(full_name: str, city: str = "", country: str = "",
                              max_results: int = 4, timeout: int = 8) -> list:
     """Consulta menciones públicas en Wikipedia en español para figuras públicas o autores."""
@@ -371,6 +389,8 @@ def search_wikipedia_by_name(full_name: str, city: str = "", country: str = "",
 # ---------------------------------------------------------------------------
 # 2) APIs oficiales de buscadores web (opcionales vía `.env`)
 # ---------------------------------------------------------------------------
+# Para qué sirve: busca perfiles indexados en redes sociales mediante Google Custom Search API si hay clave configurada.
+# Cómo funciona: arma una consulta `(site:...) "Nombre" "ciudad"` con las plataformas seleccionadas y califica cada enlace.
 def search_google_cse(full_name: str, city: str = "", country: str = "",
                       keyword: str = "", platforms: list = None, timeout: int = 10) -> list:
     """
@@ -423,6 +443,8 @@ def search_google_cse(full_name: str, city: str = "", country: str = "",
     return resultados
 
 
+# Para qué sirve: busca perfiles públicos en redes sociales usando Brave Search API si hay clave en `.env`.
+# Cómo funciona: construye consulta `site:` + nombre + zona, solicita `web/search` y evalúa cada resultado con `_score_match`.
 def search_brave_api(full_name: str, city: str = "", country: str = "",
                      keyword: str = "", platforms: list = None, timeout: int = 10) -> list:
     """
@@ -478,6 +500,8 @@ def search_brave_api(full_name: str, city: str = "", country: str = "",
 # ---------------------------------------------------------------------------
 # 3) Matriz interactiva de consultas optimizadas (Dorks legales por red social)
 # ---------------------------------------------------------------------------
+# Para qué sirve: genera dorks legales por red social, PDFs y prensa con enlaces directos a buscadores.
+# Cómo funciona: arma `site:<red> "<nombre>"` + filtros entrecomillados y codifica URLs para Google, DuckDuckGo y Bing.
 def build_social_dorks(full_name: str, city: str = "", country: str = "",
                        keyword: str = "", selected_ids: list = None) -> list:
     """
@@ -525,6 +549,8 @@ def build_social_dorks(full_name: str, city: str = "", country: str = "",
 # ---------------------------------------------------------------------------
 # 4) Orquestador principal + formatos de reporte
 # ---------------------------------------------------------------------------
+# Para qué sirve: orquesta la búsqueda completa por nombre real y ubicación combinando APIs abiertas, buscadores y dorks.
+# Cómo funciona: consulta GitHub/ORCID/OpenAlex/Wikipedia + Google/Brave si existen, deduplica por URL y prioriza ALTA -> MEDIA -> BAJA.
 def run_name_location_search(full_name: str, city: str = "", country: str = "",
                              keyword: str = "", selected_ids: list = None) -> dict:
     """
@@ -616,6 +642,8 @@ def run_name_location_search(full_name: str, city: str = "", country: str = "",
     }
 
 
+# Para qué sirve: estructura los hallazgos de búsqueda por nombre en secciones legibles para HTML y PDF.
+# Cómo funciona: arma resumen de conteos/usernames, listado `[nivel]` de candidatos y URLs Google de los dorks.
 def format_name_report(res: dict) -> dict:
     """Formatea resultados de `run_name_location_search` para HTML y PDF."""
     s = res.get("summary") or {}
@@ -646,6 +674,8 @@ def format_name_report(res: dict) -> dict:
     }
 
 
+# Para qué sirve: convierte los candidatos detectados en filas planas para exportar `busqueda_nombre.csv`.
+# Cómo funciona: extrae coincidencia, nombre, red, ubicación, URL, fuente y detalle en una lista de dicts.
 def name_csv_rows(res: dict) -> list:
     """Genera filas planas para exportar `busqueda_nombre.csv`."""
     return [

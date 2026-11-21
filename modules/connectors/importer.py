@@ -34,6 +34,8 @@ _WA_LINE_RE = re.compile(
 )
 
 
+# Para qué sirve: entrega una plantilla JSON de ejemplo compatible con el importador de OSINT-Auto.
+# Cómo funciona: retorna un diccionario estático con estructura `profile`, `posts` y `comments`.
 def sample_import_template() -> dict:
     """Plantilla JSON de ejemplo lista para descargar o adaptar."""
     return {
@@ -80,6 +82,8 @@ def sample_import_template() -> dict:
     }
 
 
+# Para qué sirve: repara cadenas corruptas (mojibake) presentes en exportaciones oficiales JSON de Meta.
+# Cómo funciona: recodifica de `latin-1` a `utf-8` devolviendo el valor original si no aplica.
 def _fix_meta_encoding(val: str) -> str:
     """Corrige el clásico doble-encoding Latin-1 -> UTF-8 de las exportaciones JSON de Meta."""
     if not isinstance(val, str) or not val:
@@ -90,6 +94,8 @@ def _fix_meta_encoding(val: str) -> str:
         return val
 
 
+# Para qué sirve: convierte timestamps epoch (segundos o milisegundos) a fecha UTC legible.
+# Cómo funciona: divide entre 1000 si supera `1e12` y formatea con `datetime.fromtimestamp(..., utc)`.
 def _ts_to_iso(ts) -> str:
     if ts in (None, ""):
         return ""
@@ -102,6 +108,8 @@ def _ts_to_iso(ts) -> str:
         return str(ts)
 
 
+# Para qué sirve: toma el primer valor no vacío entre varias claves alternativas de un diccionario importado.
+# Cómo funciona: recorre `keys` en orden y retorna `default` si ninguna tiene valor.
 def _pick(d: dict, *keys, default=""):
     for k in keys:
         if k in d and d[k] not in (None, ""):
@@ -109,6 +117,8 @@ def _pick(d: dict, *keys, default=""):
     return default
 
 
+# Para qué sirve: normaliza un objeto de publicación importado (JSON o CSV) dentro del `ConnectorBundle`.
+# Cómo funciona: extrae texto, media, menciones y hashtags usando `_pick` y agrega aristas de mención.
 def _ingest_post_obj(bundle: dict, obj: dict, idx: int, default_platform: str, default_author: str) -> None:
     content = str(_pick(obj, "content", "text", "caption", "body", "title", "message", default="")).strip()
     author = str(_pick(obj, "author", "username", "user", "author_handle", default=default_author)).strip().lstrip("@").lower()
@@ -156,6 +166,8 @@ def _ingest_post_obj(bundle: dict, obj: dict, idx: int, default_platform: str, d
         add_interaction(bundle["interactions"], author or default_author, m, "mention", weight=1.0, metadata={"platform": platform})
 
 
+# Para qué sirve: normaliza un comentario o respuesta importada en el `ConnectorBundle` generando su arista SNA.
+# Cómo funciona: resuelve autor/destino/fecha con `_pick`, guarda el comentario y añade aristas `comment` y `mention`.
 def _ingest_comment_obj(bundle: dict, obj: dict, idx: int, default_platform: str, default_subject: str) -> None:
     content = str(_pick(obj, "content", "text", "body", "comment", "message", default="")).strip()
     author = str(_pick(obj, "author", "author_handle", "username", "user", "from", default="")).strip().lstrip("@").lower()
@@ -187,6 +199,8 @@ def _ingest_comment_obj(bundle: dict, obj: dict, idx: int, default_platform: str
 # ---------------------------------------------------------------------------
 # Parser nativo de exportaciones oficiales de Meta (Facebook / Instagram / Threads)
 # ---------------------------------------------------------------------------
+# Para qué sirve: detecta e ingiere archivos JSON oficiales de Facebook, Instagram o Threads sin configuración manual.
+# Cómo funciona: procesa listas Meta (`string_map_data`, `string_list_data`, `friends_v2`, `comments_v2`, `data`) corrigiendo mojibake.
 def _parse_meta_json_object(bundle: dict, data, platform: str, subject: str, source_tag: str = "meta") -> bool:
     """
     Detecta e ingiere estructuras estándar de exportación JSON de Facebook / Instagram / Threads.
@@ -195,6 +209,8 @@ def _parse_meta_json_object(bundle: dict, data, platform: str, subject: str, sou
     handled = False
     subj = (subject or "sujeto").strip().lstrip("@").lower()
 
+    # Para qué sirve: recorre un arreglo de registros Meta diferenciando comentarios, seguidores, amigos y posts.
+    # Cómo funciona: inspecciona la estructura (`string_map_data`, `string_list_data`, `name`, `data`) e inserta en `bundle`.
     def _handle_meta_items(items: list, hint_key: str = ""):
         nonlocal handled
         hk = hint_key.lower()
@@ -334,6 +350,8 @@ def _parse_meta_json_object(bundle: dict, data, platform: str, subject: str, sou
 # ---------------------------------------------------------------------------
 # Parser de chats exportados de WhatsApp (.txt)
 # ---------------------------------------------------------------------------
+# Para qué sirve: convierte un chat exportado de WhatsApp (`.txt`) en mensajes e interacciones de red.
+# Cómo funciona: parsea líneas con `_WA_LINE_RE`, deduce al sujeto si falta (el participante más activo) y alterna emisor/receptor.
 def _parse_whatsapp_txt(bundle: dict, text: str, subject: str, platform: str = "whatsapp") -> None:
     subj = (subject or "").strip().lstrip("@").lower()
     messages = []
@@ -386,6 +404,8 @@ def _parse_whatsapp_txt(bundle: dict, text: str, subject: str, platform: str = "
 # ---------------------------------------------------------------------------
 # Punto de entrada principal del importador
 # ---------------------------------------------------------------------------
+# Para qué sirve: detecta el formato del archivo subido (`.zip`, `.txt`, `.csv`, `.json`) y lo convierte en un `ConnectorBundle`.
+# Cómo funciona: despacha por extensión al parser de Meta ZIP, WhatsApp TXT, CSV o JSON (Meta/plantilla) tolerando errores de formato.
 def parse_imported_content(
     raw_bytes: bytes,
     filename: str,

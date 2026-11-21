@@ -4,6 +4,8 @@ from pathlib import Path
 from . import utils
 
 
+# Para qué sirve: construye la línea de comandos de Maigret con salida múltiple para correlación posterior.
+# Cómo funciona: solicita HTML/PDF/CSV y `--json simple`, añadiendo tags de país/redes sociales y tope de sitios.
 def _cmd_maigret(username: str, out_dir: Path, country: str = None,
                  top: int = None, social_only: bool = False) -> list:
     """
@@ -30,6 +32,8 @@ def _cmd_maigret(username: str, out_dir: Path, country: str = None,
     return cmd
 
 
+# Para qué sirve: construye el comando de Sherlock apuntando al archivo de salida del caso.
+# Cómo funciona: usa `--print-found` y `--output sherlock_<username>.txt` con timeout de 20 s por sitio.
 def _cmd_sherlock(username: str, out_dir: Path) -> list:
     """Arma el comando de Sherlock guardando la salida en la carpeta del caso."""
     return utils.tool_command("sherlock") + [
@@ -38,6 +42,8 @@ def _cmd_sherlock(username: str, out_dir: Path) -> list:
     ]
 
 
+# Para qué sirve: ejecuta la búsqueda de perfiles por username combinando Maigret y Sherlock.
+# Cómo funciona: verifica qué binarios están disponibles, corre cada subproceso en `out_dir` y retorna sus códigos/salidas.
 def run_username_search(username: str, out_dir: Path, country: str = None,
                         top: int = None, exclude: list = None,
                         social_only: bool = False) -> dict:

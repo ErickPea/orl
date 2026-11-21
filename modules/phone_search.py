@@ -42,6 +42,8 @@ _TIPOS_LINEA = {
 _LINEA_IGNORANT = re.compile(r"^\[([+\-x])\]\s+([\w.-]+\.[a-z]{2,})(?:\s+(.*))?$", re.I)
 
 
+# Para qué sirve: divide un número telefónico internacional en código de país y número nacional.
+# Cómo funciona: usa `phonenumbers.parse` (anteponiendo `+` si falta) y recurre a `PREFIJOS` si la librería no está disponible.
 def split_phone(phone: str):
     """
     Separa '+573001234567' en ('57', '3001234567').
@@ -73,6 +75,8 @@ _VOIP_CARRIER_HINTS = (
 )
 
 
+# Para qué sirve: produce formatos de marcación, evalúa si la línea es VoIP y arma dorks/enlaces directos (WhatsApp/Telegram).
+# Cómo funciona: combina formatos E.164/internacional/nacional/segmentados, inspecciona operador/tipo y arma URLs de búsqueda.
 def build_phone_variants_and_dorks(phone: str, analysis: dict) -> dict:
     """
     Genera variantes de formato habituales (E.164, internacional, nacional, con guiones/espacios),
@@ -84,6 +88,8 @@ def build_phone_variants_and_dorks(phone: str, analysis: dict) -> dict:
     digits_full = re.sub(r"\D", "", e164 or phone)
     variants = []
 
+    # Para qué sirve: agrega una variante de formato a la lista evitando vacíos y duplicados.
+    # Cómo funciona: limpia espacios y comprueba pertenencia en `variants`.
     def _add(v: str):
         v = (v or "").strip()
         if v and v not in variants:
@@ -129,6 +135,8 @@ def build_phone_variants_and_dorks(phone: str, analysis: dict) -> dict:
     q_docs = f"({or_expr}) (filetype:pdf OR filetype:doc OR filetype:docx OR site:scribd.com)"
     q_contact = f'({or_expr}) ("whatsapp" OR "contacto" OR "tel" OR "cel")'
 
+    # Para qué sirve: construye enlaces de búsqueda directa en Google, DuckDuckGo y Bing para un dork dado.
+    # Cómo funciona: codifica la consulta con `quote_plus` e interpola la URL de cada buscador.
     def _links(q: str) -> dict:
         eq = quote_plus(q)
         return {
@@ -157,6 +165,8 @@ def build_phone_variants_and_dorks(phone: str, analysis: dict) -> dict:
     }
 
 
+# Para qué sirve: obtiene metadatos técnicos locales del número (país, operador, tipo de línea y huso horario) sin red.
+# Cómo funciona: parsea con `phonenumbers` consultando `geocoder`, `carrier`, `number_type` y `timezone`, con fallback si falta la librería.
 def analyze_phone(phone: str) -> dict:
     """
     Realiza análisis técnico local del número usando `phonenumbers`:
@@ -209,6 +219,8 @@ def analyze_phone(phone: str) -> dict:
     return info
 
 
+# Para qué sirve: interpreta la salida de Ignorant distinguiendo registros confirmados de servicios limitados por rate-limit.
+# Cómo funciona: filtra banners y aplica `_LINEA_IGNORANT` para agrupar `[+]`, `[-]` y `[x]` sin duplicados.
 def parse_ignorant_output(text: str) -> dict:
     """
     Extrae resultados estructurados de la salida de Ignorant, separando:
@@ -242,6 +254,8 @@ def parse_ignorant_output(text: str) -> dict:
     }
 
 
+# Para qué sirve: ejecuta el flujo completo de OSINT telefónico combinando análisis local, dorks e Ignorant.
+# Cómo funciona: valida y normaliza con `analyze_phone`, genera variantes/dorks, lanza `ignorant <país> <número>` y guarda el log.
 def run_phone_search(phone: str, out_dir: Path) -> dict:
     """
     Ejecuta análisis técnico (`phonenumbers`) y luego Ignorant (`ignorant <país> <número>`).

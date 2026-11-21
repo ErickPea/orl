@@ -15,6 +15,7 @@ export const NODE_COLORS = {
   signal:  "#f59e0b",
 };
 
+/** Renderiza tarjeta de evaluación de exposición pública y privacidad. */
 export function renderPrivacyCard(privacy) {
   if (!privacy) return "";
   const color = privacy.level === "ALTO" ? "var(--rose)" : privacy.level === "MODERADO" ? "var(--amber)" : "var(--emerald)";
@@ -42,6 +43,7 @@ export function renderPrivacyCard(privacy) {
   `;
 }
 
+/** Genera tarjeta contenedora del grafo SVG de huella digital. */
 export function renderGraphCard(graphId, graph) {
   if (!graph || !graph.nodes || graph.nodes.length <= 1) return "";
   state.graphCache[graphId] = { graph, onlyAlta: false };
@@ -73,6 +75,7 @@ export function renderGraphCard(graphId, graph) {
   `;
 }
 
+/** Dibuja el grafo radial SVG de perfiles y señales encontradas. */
 export function drawFootprintGraph(graphId) {
   const entry = state.graphCache[graphId];
   const wrap = document.getElementById(`graph-svg-wrap-${graphId}`);
@@ -147,6 +150,7 @@ export function drawFootprintGraph(graphId) {
   });
 }
 
+/** Enlaza el filtro "Solo ALTA" del grafo SVG de huella digital. */
 export function bindFootprintGraph(graphId) {
   if (!state.graphCache[graphId]) return;
   drawFootprintGraph(graphId);
@@ -162,6 +166,7 @@ export function bindFootprintGraph(graphId) {
   });
 }
 
+/** Renderiza tarjetas de perfiles sociales enriquecidos con metadatos públicos o login-wall. */
 export function renderSocialCards(socialProfiles) {
   if (!socialProfiles || !socialProfiles.length) {
     return `<div class="panel-card"><div class="muted">No se detectaron redes sociales para este username.</div></div>`;
@@ -227,6 +232,7 @@ export function badgeForConf(conf) {
   return `<span class="badge ${map[conf] || "badge-info"}">${esc(conf)}</span>`;
 }
 
+/** Renderiza sección completa de perfiles descubiertos con filtros y señales de identidad. */
 export function renderProfilesSection(jobId, summary, profiles, signals) {
   state.profileCache[jobId] = { profiles: profiles || [], filter: "ALL", query: "" };
 
@@ -266,6 +272,7 @@ export function renderProfilesSection(jobId, summary, profiles, signals) {
   `;
 }
 
+/** Construye tabla HTML escapada para la lista de perfiles filtrados. */
 export function buildProfilesTable(profiles) {
   if (!profiles || !profiles.length) {
     return `<div class="muted">No se encontraron perfiles con los filtros actuales.</div>`;
@@ -294,6 +301,7 @@ export function buildProfilesTable(profiles) {
   `;
 }
 
+/** Conecta filtros por nivel de confianza y texto sobre la tabla de perfiles. */
 export function bindProfileFilters(jobId) {
   const seg = document.querySelector(`[data-profile-filter="${jobId}"]`);
   const inp = document.querySelector(`[data-profile-search="${jobId}"]`);
@@ -327,6 +335,7 @@ export function bindProfileFilters(jobId) {
   }
 }
 
+/** Renderiza bloque de brechas públicas detectadas en XposedOrNot/HIBP. */
 export function renderBreachBlock(breachRes) {
   if (!breachRes) return "";
   const exposed = breachRes.breached;
@@ -376,6 +385,7 @@ export function renderBreachBlock(breachRes) {
   `;
 }
 
+/** Renderiza resultados del análisis de correo (MX, Gravatar, Holehe y brechas). */
 export function renderEmailResult(job, container) {
   const r = job.result || {};
   if (r.kind === "email_generate") {
@@ -457,6 +467,7 @@ export function renderEmailResult(job, container) {
   `;
 }
 
+/** Renderiza resultados técnicos del análisis de teléfono (`phonenumbers` + Ignorant). */
 export function renderPhoneResult(job, container) {
   const r = job.result || {};
   const an = r.analysis || {};
@@ -552,6 +563,7 @@ export function renderPhoneResult(job, container) {
   `;
 }
 
+/** Renderiza resultados de búsqueda por nombre + ubicación y matriz por plataforma. */
 export function renderNameLocationResult(job, container) {
   const r = job.result || {};
   const s = r.summary || {};
@@ -666,6 +678,7 @@ export function renderNameLocationResult(job, container) {
   });
 }
 
+/** Renderiza metadatos EXIF/GPS/hashes y descarga sanitizada de un archivo subido. */
 export function renderMediaResult(payload, container) {
   const r = payload.result || {};
   const priv = r.privacy || {};

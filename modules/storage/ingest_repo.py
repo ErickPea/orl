@@ -15,6 +15,8 @@ from .cases_repo import (
 )
 from modules.entity_resolution import normalize_text
 
+# Para qué sirve: Inserta o actualiza un interactuante dentro de una transacción abierta y retorna su id.
+# Cómo funciona: Ejecuta INSERT ... ON CONFLICT DO UPDATE sobre `case_interactants` usando `conn` compartido y devuelve `lastrowid` o el `id` consultado.
 def _upsert_interactant_conn(
     conn,
     case_id: str,
@@ -64,6 +66,8 @@ def _upsert_interactant_conn(
 # ---------------------------------------------------------------------------
 # Fase 2 :: Ingesta estructurada de conectores abiertos e importador
 # ---------------------------------------------------------------------------
+# Para qué sirve: Persiste un lote normalizado de perfil, publicaciones, comentarios, media e interacciones de un conector.
+# Cómo funciona: Abre una transacción SQLite única, actualiza bio/perfil, inserta posts/comentarios/reacciones/medios sin duplicados y registra evidencias.
 def ingest_connector_bundle(case_id: str, bundle: dict, job_id: str = "") -> Optional[dict]:
     """
     Persiste un `ConnectorBundle` normalizado (de API abierta o importador JSON/CSV)
@@ -481,6 +485,8 @@ def ingest_connector_bundle(case_id: str, bundle: dict, job_id: str = "") -> Opt
     return summary
 
 
+# Para qué sirve: Recupera el contenido social e interactivo almacenado para mostrarlo en la ficha del caso.
+# Cómo funciona: Consulta posts, comentarios, interacciones e ítems multimedia de `case_id` filtrando opcionalmente contenido de amigos.
 def get_case_content(
     case_id: str,
     limit_posts: int = 50,
@@ -579,6 +585,8 @@ def get_case_content(
 
 
 
+# Para qué sirve: Recolecta los nombres de carpetas en `output/` vinculados a casos activos para evitar borrarlos en limpiezas.
+# Cómo funciona: Consulta las columnas `folder` no vacías de `case_runs` y `media_items` y devuelve su unión en un `set`.
 def get_all_referenced_folders() -> set:
     """Devuelve el conjunto de carpetas de `output/` referenciadas por algún caso activo en SQLite."""
     folders = set()

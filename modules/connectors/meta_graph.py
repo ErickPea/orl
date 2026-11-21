@@ -32,6 +32,8 @@ from modules.connectors.common import (
 META_GRAPH_API = "https://graph.facebook.com/v21.0"
 
 
+# Para qué sirve: localiza el ID y username de la cuenta Instagram Business/Creator vinculada al usuario OAuth2.
+# Cómo funciona: consulta `/me/accounts` en Meta Graph API buscando el primer objeto `instagram_business_account`.
 def _resolve_ig_business_account(access_token: str, timeout: int = 12) -> tuple:
     """Busca la cuenta de Instagram Business/Creator vinculada a las Páginas del usuario autorizado."""
     r = requests.get(
@@ -50,6 +52,8 @@ def _resolve_ig_business_account(access_token: str, timeout: int = 12) -> tuple:
     return None, None, "No se encontró ninguna cuenta profesional de Instagram vinculada a tus Páginas de Facebook."
 
 
+# Para qué sirve: extrae perfil, publicaciones y comentarios autorizados de Instagram Profesional vía Meta Graph API.
+# Cómo funciona: lee cuenta propia completa (`/{ig_id}/media` + `/comments`) o usa `business_discovery` en cuentas Pro de terceros.
 def fetch_instagram_pro(
     handle: str,
     limit: int = 20,
@@ -305,6 +309,8 @@ def fetch_instagram_pro(
     return bundle
 
 
+# Para qué sirve: extrae información, publicaciones, comentarios y reacciones de una Página de Facebook administrada por OAuth2.
+# Cómo funciona: lista Páginas en `/me/accounts`, usa su token de página para leer `/{page_id}/posts` y normaliza al `ConnectorBundle`.
 def fetch_facebook_page(
     handle: str,
     limit: int = 20,

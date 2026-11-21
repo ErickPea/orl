@@ -22,6 +22,8 @@ from modules.entity_resolution import evaluate_case_resolution, normalize_text, 
 # ---------------------------------------------------------------------------
 # Gestión de Casos y Entidad Principal
 # ---------------------------------------------------------------------------
+# Para qué sirve: Crea un nuevo caso OSINT junto con su entidad principal y semillas iniciales opcionales.
+# Cómo funciona: Inserta en `cases` y `entities`, registra identificadores iniciales con `add_identifier`, recalcula resolución y retorna el detalle.
 def create_case(
     title: str,
     subject_name: str = "",
@@ -71,6 +73,8 @@ def create_case(
     return get_case_detail(case_id)
 
 
+# Para qué sirve: Obtiene el ID de la entidad principal asociada a un caso.
+# Cómo funciona: Consulta `entities` ordenando por `is_primary DESC, created_at ASC` dentro de la conexión dada.
 def _get_primary_entity_id(conn: sqlite3.Connection, case_id: str) -> Optional[str]:
     row = conn.execute(
         "SELECT id FROM entities WHERE case_id = ? ORDER BY is_primary DESC, created_at ASC LIMIT 1",
@@ -79,7 +83,10 @@ def _get_primary_entity_id(conn: sqlite3.Connection, case_id: str) -> Optional[s
     return row["id"] if row else None
 
 
+# Para qué sirve: Verifica rápidamente si un `case_id` existe en la tabla `cases`.
+# Cómo funciona: Ejecuta `SELECT 1 FROM cases WHERE id = ?` y devuelve `True` si obtiene fila.
 def case_exists(case_id: str) -> bool:
+    """Comprueba si el caso existe en SQLite."""
     if not case_id:
         return False
     with _connect() as conn:
@@ -87,6 +94,8 @@ def case_exists(case_id: str) -> bool:
         return row is not None
 
 
+# Para qué sirve: Lista todos los casos registrados junto con sus contadores de evidencia y perfiles.
+# Cómo funciona: Ejecuta un `SELECT` con subconsultas `COUNT(*)` por tabla hija y decodifica `resolution_json`.
 def list_cases() -> list:
     """Devuelve todos los casos ordenados por actualización reciente con métricas agregadas."""
     with _connect() as conn:
@@ -115,12 +124,17 @@ def list_cases() -> list:
     return out
 
 
+# Para qué sirve: Devuelve la cantidad total de casos almacenados en SQLite.
+# Cómo funciona: Ejecuta `SELECT COUNT(*) AS n FROM cases` y retorna el entero resultante.
 def count_cases() -> int:
+    """Devuelve el número total de casos registrados."""
     with _connect() as conn:
         row = conn.execute("SELECT COUNT(*) AS n FROM cases").fetchone()
         return int(row["n"]) if row else 0
 
 
+# Para qué sirve: Actualiza metadatos, estado o ámbito de amigos de un caso existente.
+# Cómo funciona: Construye dinámicamente el `UPDATE cases`, sincroniza `entities.canonical_name` si cambia el sujeto y recalcula resolución.
 def update_case(
     case_id: str,
     title: Optional[str] = None,
@@ -130,6 +144,7 @@ def update_case(
     status: Optional[str] = None,
     friend_scope_enabled: Optional[bool] = None,
 ) -> Optional[dict]:
+    """Actualiza metadatos y banderas del caso (incluida `friend_scope_enabled`) y recalcula resolución."""
     if not case_exists(case_id):
         return None
     updates = []
@@ -170,6 +185,8 @@ def update_case(
     return get_case_detail(case_id)
 
 
+# Para qué sirve: Elimina un caso en cascada de SQLite y opcionalmente borra sus carpetas en `OUTPUT_ROOT`.
+# Cómo funciona: Recolecta carpetas referenciadas, borra la fila en `cases` (cascada FK) y aplica `shutil.rmtree` validando que sigan dentro de `OUTPUT_ROOT`.
 def delete_case(case_id: str, delete_files: bool = False) -> dict:
     """
     Elimina un caso completo en cascada en SQLite.
@@ -199,6 +216,8 @@ def delete_case(case_id: str, delete_files: bool = False) -> dict:
     return {"deleted": True, "deleted_folders": deleted_folders}
 
 
+# Para qué sirve: Construye la vista completa consolidada de un caso OSINT.
+# Cómo funciona: Consulta caso, entidades, identificadores, perfiles ordenados, medios, bitácora y contadores de contenido social en SQLite.
 def get_case_detail(case_id: str) -> Optional[dict]:
     """Devuelve toda la vista consolidada de un caso."""
     with _connect() as conn:
@@ -290,6 +309,8 @@ def get_case_detail(case_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # Identificadores y Perfiles
 # ---------------------------------------------------------------------------
+# Para qué sirve: Agrega o actualiza un identificador semilla en el caso deduplicando por su forma normalizada.
+# Cómo funciona: Normaliza según `kind`, ejecuta upsert sobre `identifiers` y dispara recálculo de resolución si `recalc=True`.
 def add_identifier(
     case_id: str,
     kind: str,
@@ -298,6 +319,7 @@ def add_identifier(
     confidence: str = "ALTA",
     recalc: bool = True,
 ) -> Optional[dict]:
+    """Agrega o deduplica un identificador semilla del caso (username, email, teléfono, etc.)."""
     clean_kind = (kind or "other").strip().lower()
     if clean_kind not in VALID_IDENTIFIER_KINDS:
         clean_kind = "other"
@@ -331,7 +353,10 @@ def add_identifier(
     return dict(row) if row else None
 
 
+# Para qué sirve: Elimina un identificador del caso y actualiza la resolución de entidades asociada.
+# Cómo funciona: Ejecuta `DELETE FROM identifiers`, refresca `cases.updated_at` y llama a `recalculate_case_resolution`.
 def delete_identifier(case_id: str, identifier_id: int) -> bool:
+    """Elimina un identificador del caso y recalcula la resolución de entidades."""
     with _connect() as conn:
         cur = conn.execute(
             "DELETE FROM identifiers WHERE id = ? AND case_id = ?",
@@ -345,6 +370,8 @@ def delete_identifier(case_id: str, identifier_id: int) -> bool:
     return deleted
 
 
+# Para qué sirve: Combina cadenas de fuentes de hallazgos sin repetir nombres.
+# Cómo funciona: Divide `existing` e `incoming` por `+` y `,` preservando orden y unicidad insensible a mayúsculas.
 def _merge_sources(existing: str, incoming: str) -> str:
     parts = []
     seen = set()
@@ -357,6 +384,8 @@ def _merge_sources(existing: str, incoming: str) -> str:
     return "+".join(parts)
 
 
+# Para qué sirve: Selecciona el nivel de confianza OSINT mayor entre dos valores dados.
+# Cómo funciona: Compara ambos niveles con un diccionario de prioridades (`ALTA` > `MEDIA` > `BAJA`).
 def _best_confidence(a: str, b: str) -> str:
     rank = {"ALTA": 3, "MEDIA": 2, "BAJA": 1}
     ua = (a or "BAJA").upper()
@@ -364,6 +393,8 @@ def _best_confidence(a: str, b: str) -> str:
     return ua if rank.get(ua, 0) >= rank.get(ub, 0) else ub
 
 
+# Para qué sirve: Inserta o enriquece un perfil encontrado dentro del caso evitando duplicados por URL.
+# Cómo funciona: Normaliza la URL, fusiona metadatos/fuentes/confianza si ya existe o inserta en `profiles` y recalcula si `recalc=True`.
 def upsert_profile(
     case_id: str,
     site: str,
@@ -468,6 +499,8 @@ def upsert_profile(
     return dict(row) if row else None
 
 
+# Para qué sirve: Permite al analista confirmar, rechazar o devolver a automático el estado de un perfil del caso.
+# Cómo funciona: Valida `manual_status` contra `VALID_MANUAL_STATUS`, actualiza `profiles` y recalcula la resolución del caso.
 def set_profile_manual_status(case_id: str, profile_id: int, manual_status: str) -> Optional[dict]:
     """Permite al analista confirmar, descartar o regresar a evaluación automática un perfil."""
     status = (manual_status or "").strip().lower()
@@ -487,6 +520,8 @@ def set_profile_manual_status(case_id: str, profile_id: int, manual_status: str)
 # ---------------------------------------------------------------------------
 # Recálculo de Resolución de Entidades
 # ---------------------------------------------------------------------------
+# Para qué sirve: Recalcula los puntajes y niveles de resolución de identidad de todos los perfiles de un caso.
+# Cómo funciona: Obtiene identificadores y perfiles, ejecuta `evaluate_case_resolution` y actualiza `profiles` y `cases.resolution_json`.
 def recalculate_case_resolution(case_id: str) -> Optional[dict]:
     """Ejecuta el motor de Entity Resolution sobre todos los perfiles del caso y persiste resultados."""
     with _connect() as conn:
@@ -537,6 +572,8 @@ def recalculate_case_resolution(case_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # Registro de Media y Ejecuciones (Runs)
 # ---------------------------------------------------------------------------
+# Para qué sirve: Registra un archivo multimedia inspeccionado (EXIF, GPS, hashes y copia limpia) en un caso.
+# Cómo funciona: Extrae coordenadas, hashes y dispositivo de `media_result` e inserta una fila en `media_items`.
 def add_media_item(
     case_id: str,
     media_result: dict,
@@ -544,6 +581,7 @@ def add_media_item(
     clean_copy_url: str = "",
     local_path: str = "",
 ) -> Optional[dict]:
+    """Registra metadatos EXIF/GPS/hashes de un archivo multimedia inspeccionado para el caso."""
     if not case_exists(case_id):
         return None
     now = _now_iso()
@@ -587,6 +625,8 @@ def add_media_item(
     return dict(row) if row else None
 
 
+# Para qué sirve: Anota una ejecución u operación auditada dentro de la bitácora `case_runs`.
+# Cómo funciona: Inserta tipo, objetivo, estado, carpeta y resumen JSON en `case_runs` y actualiza `cases.updated_at`.
 def record_case_run(
     case_id: str,
     kind: str,
@@ -596,6 +636,7 @@ def record_case_run(
     summary: Optional[dict] = None,
     job_id: str = "",
 ) -> Optional[dict]:
+    """Registra un evento en la bitácora de auditoría `case_runs` del caso."""
     if not case_exists(case_id):
         return None
     now = _now_iso()
@@ -625,6 +666,8 @@ def record_case_run(
 # ---------------------------------------------------------------------------
 # Ingesta automática desde resultados de jobs de OSINT-Auto
 # ---------------------------------------------------------------------------
+# Para qué sirve: Normaliza un diccionario heterogéneo de perfil a los campos esperados por `upsert_profile`.
+# Cómo funciona: Combina `public_meta`, `metadata` y claves legacy para devolver sitio, URL, handle, bio, ubicación y confianza.
 def _extract_profile_fields(p: dict, fallback_username: str = "") -> dict:
     """Extrae metadatos normalizados de un perfil generado por reports/social_enrich/name_search."""
     pm = p.get("public_meta") or {}
@@ -678,6 +721,8 @@ def _extract_profile_fields(p: dict, fallback_username: str = "") -> dict:
     }
 
 
+# Para qué sirve: Ingresa automáticamente hallazgos de cualquier job OSINT terminado dentro del caso en SQLite.
+# Cómo funciona: Despacha según `kind` para agregar identificadores/perfiles sin recalcular en cada paso, registra el run y recalcula resolución al final.
 def ingest_job_result_to_case(
     case_id: str,
     job_id: str,
@@ -823,6 +868,8 @@ def ingest_job_result_to_case(
 # ---------------------------------------------------------------------------
 # Persistencia de Jobs (para sobrevivir reinicios del servidor)
 # ---------------------------------------------------------------------------
+# Para qué sirve: Guarda o actualiza el estado y progreso de un job asíncrono en SQLite.
+# Cómo funciona: Ejecuta upsert en la tabla `jobs` serializando logs, archivos y resultado en JSON.
 def save_job(job: dict) -> None:
     """Guarda o actualiza el estado de un job en SQLite."""
     with _connect() as conn:
@@ -863,7 +910,10 @@ def save_job(job: dict) -> None:
         )
 
 
+# Para qué sirve: Lista los jobs persistidos más recientes sin cargar su payload completo `result_json`.
+# Cómo funciona: Selecciona columnas resumidas de `jobs` ordenadas por `started_at DESC` con límite configurable.
 def list_persisted_jobs(limit: int = 25) -> list:
+    """Lista los últimos trabajos persistidos en SQLite ordenados por fecha descendente."""
     with _connect() as conn:
         rows = conn.execute(
             """
@@ -884,7 +934,10 @@ def list_persisted_jobs(limit: int = 25) -> list:
     return out
 
 
+# Para qué sirve: Recupera el detalle completo de un job persistido incluyendo logs, archivos y resultado.
+# Cómo funciona: Consulta `SELECT * FROM jobs WHERE id = ?` y decodifica `logs_json`, `files_json` y `result_json`.
 def get_persisted_job(job_id: str) -> Optional[dict]:
+    """Recupera el detalle completo (logs, archivos y resultado) de un job persistido."""
     with _connect() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if not row:
@@ -896,6 +949,8 @@ def get_persisted_job(job_id: str) -> Optional[dict]:
     return d
 
 
+# Para qué sirve: Marca como fallidos los jobs que quedaron en estado `running` tras un reinicio del servidor.
+# Cómo funciona: Busca filas `running` en `jobs`, agrega motivo al log y las actualiza a `error` con progreso 100.
 def recover_orphaned_jobs(reason: str = "Interrumpido por reinicio o cierre inesperado del servidor.") -> int:
     """
     Marca como `error` los jobs que quedaron en estado `running` en SQLite tras un reinicio,
